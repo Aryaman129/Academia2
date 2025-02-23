@@ -8,11 +8,15 @@ import json
 from flask import Response
 from dotenv import load_dotenv
 import os
+from flask_cors import CORS  # Import CORS
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
+
+# Enable CORS for the entire app
+CORS(app)
 
 @app.route('/')
 def home():
@@ -74,3 +78,4 @@ def getPersonalDetails():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
