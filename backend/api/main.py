@@ -6,18 +6,19 @@ import timetable
 import course_personal_details
 import json
 from flask import Response
+from dotenv import load_dotenv
+import os
 
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-
 
 @app.route('/')
 def home():
     json_o = {"status": "success", "msg": "*** ACADEMIA API WITH PYTHON *** By Yogesh Kumawat"}
     json_o = json.dumps(json_o)
     return json_o
-
-
 
 @app.route('/token', methods=['GET', 'POST'])
 def request():
@@ -31,8 +32,6 @@ def request():
         response = Response(response, status=200, mimetype='application/json')
         return response
 
-
-
 @app.route('/AttAndMarks', methods=['GET', 'POST'])
 def AttAndMarks():
     if 'token' in rq.args:
@@ -45,8 +44,6 @@ def AttAndMarks():
         response = json.dumps(response)
         response = Response(response, status=200, mimetype='application/json')
         return response
-
-
 
 @app.route('/TimeTable', methods=['GET', 'POST'])
 def TimeTable():
@@ -62,8 +59,6 @@ def TimeTable():
         response = Response(response, status=200, mimetype='application/json')
         return response
 
-
-
 @app.route('/PersonalDetails', methods=['GET', 'POST'])
 def getPersonalDetails():
     if 'token' in rq.args:
@@ -76,10 +71,6 @@ def getPersonalDetails():
         response = json.dumps(response)
         response = Response(response, status=200, mimetype='application/json')
         return response
-
-
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,43 +1,51 @@
 import requests
 import json
-from urllib.parse import parse_qs
 import base64
 
+LOGIN_URL = "https://academia.srmist.edu.in/accounts/signin.ac"
 
-url = "https://academia.srmuniv.ac.in/accounts/signin.ac"
+HEADERS = {
+    'Origin': 'https://academia.srmist.edu.in',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.89 Safari/537.36'
+}
 
-headers = {'Origin': 'https://academia.srmuniv.ac.in',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.89 Safari/537.36' }
+def get_auth_token(username, password):
+    session = requests.Session()  # Maintains session persistence
+    
+    payload = {
+        'username': username,
+        'password': password,
+        'client_portal': 'true',  
+        'portal': '10002227248',  
+        'is_ajax': 'true',
+        'grant_type': 'password'
+    }
 
+    try:
+        response = session.post(LOGIN_URL, data=payload, headers=HEADERS)
+        response.raise_for_status()  # Raises error if request fails
+        
+        # Parse JSON response
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            return json.dumps({"status": "error", "msg": "Invalid JSON response from server."})
 
+        # Check if authentication was successful
+        if "error" in data:
+            return json.dumps({"status": "error", "msg": data['error'].get('msg', "Login failed.")})
 
+        # Extract cookies (authentication token)
+        cookies = session.cookies.get_dict()
+        if not cookies:
+            return json.dumps({"status": "error", "msg": "Authentication failed. No session token found."})
 
-def getToken(username, password):
-    payload = {'username': username,
-               'password': password,
-               'client_portal': 'true',
-               'portal': '10002227248',
-               'servicename': 'ZohoCreator',
-               'serviceurl': 'https://academia.srmuniv.ac.in/',
-               'is_ajax': 'true',
-               'grant_type': 'password',
-               'service_language': 'en'}
+        # Encode cookies as token
+        token = base64.b64encode(json.dumps(cookies).encode()).decode()
+        return json.dumps({"status": "success", "token": token})
 
-    r = requests.post(url, data=payload, headers=headers)
-    json_data = json.loads(r.text)
+    except requests.exceptions.RequestException as e:
+        return json.dumps({"status": "error", "msg": str(e)})
 
-    if "error" in json_data:
-        error_m = json_data['error']['msg']
-        json_o = {"status":"error", "msg":error_m}
-        return json.dumps(json_o)
-    else:
-        params = parse_qs(json_data['data']['token_params'])
-        params['state'] = 'https://academia.srmuniv.ac.in/'
-        r = requests.get(json_data['data']['oauthorize_uri'], data=params, headers=headers)
-        token = json.dumps(r.history[0].cookies.get_dict())
-        token = str(base64.encodestring(str.encode(token)),'utf-8')
-
-
-        json_o = {"status":"success", "token": token}
-        return json.dumps(json_o)
-
+# Example Usage
+print(get_auth_token("your_username", "your_password"))
