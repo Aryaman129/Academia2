@@ -1,9 +1,9 @@
 from flask import Flask
 from flask import request as rq
-import token_srm
-import attendence_marks
-import timetable
-import course_personal_details
+from api import token_srm  # ✅ Correct way to import from 'api' folder
+from api import attendence_marks
+from api import timetable
+from api import course_personal_details
 import json
 from flask import Response
 from dotenv import load_dotenv
@@ -40,7 +40,7 @@ def request():
 def AttAndMarks():
     if 'token' in rq.args:
         token = str(rq.args.get('token'))
-        att_marks = attendence_marks.getAttendenceAndMarks(token)
+        att_marks = attendence_marks.get_attendance_and_marks(token)
         response = Response(att_marks, status=200, mimetype='application/json')
         return response
     else:

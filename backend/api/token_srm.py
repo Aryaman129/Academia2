@@ -9,7 +9,7 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.89 Safari/537.36'
 }
 
-def get_auth_token(username, password):
+def getToken(username, password):  # Ensure function name matches main.py
     session = requests.Session()  # Maintains session persistence
     
     payload = {
@@ -38,7 +38,7 @@ def get_auth_token(username, password):
         # Extract cookies (authentication token)
         cookies = session.cookies.get_dict()
         if not cookies:
-            return json.dumps({"status": "error", "msg": "Authentication failed. No session token found."})
+            return json.dumps({"status": "error", "msg": "Authentication failed. No session token found."})  # FIXED
 
         # Encode cookies as token
         token = base64.b64encode(json.dumps(cookies).encode()).decode()
@@ -47,5 +47,7 @@ def get_auth_token(username, password):
     except requests.exceptions.RequestException as e:
         return json.dumps({"status": "error", "msg": str(e)})
 
-# Example Usage
-print(get_auth_token("your_username", "your_password"))
+# Test if function runs correctly
+if __name__ == "__main__":
+    print(getToken("am5965@srmist.edu.in", "Galactic@1296"))
+
