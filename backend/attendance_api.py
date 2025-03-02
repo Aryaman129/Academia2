@@ -1,122 +1,109 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from supabase import create_client, Client
 import os
+import requests
+import threading  # Runs scraper in background
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
+from scrape_attendance import run_scraper  # ✅ Import the scraper function
 
+# ✅ Load environment variables
 load_dotenv()
 
+# ✅ Initialize Flask App
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+app.secret_key = "your_secret_key"
+CORS(app, supports_credentials=True)
 
+# ✅ Supabase Setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing Supabase credentials")
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ✅ Function to Fetch User from Supabase
 def get_user_by_email(email):
     try:
-        response = supabase.table("users").select("*").eq("email", email).execute()
-        return response.data[0] if response.data else None
+        response = supabase.table("users").select("*").eq("email", email).single().execute()
+        return response.data if response.data else None
     except Exception as e:
         print(f"Error getting user: {e}")
-        return None
+    return None
 
-@app.route("/signup", methods=["POST"])
-def signup():
-    try:
-        data = request.json
-        email = data.get("email")
-        password = data.get("password")
-        registration_number = data.get("registration_number")
-
-        if not all([email, password, registration_number]):
-            return jsonify({"success": False, "error": "Missing required fields"}), 400
-
-        # Check if email exists
-        existing_user = get_user_by_email(email)
-        if existing_user:
-            return jsonify({"success": False, "error": "Email already registered"}), 400
-
-        # Create new user
-        new_user = {
-            "email": email,
-            "password_hash": generate_password_hash(password),
-            "registration_number": registration_number
-        }
-
-        result = supabase.table("users").insert(new_user).execute()
-        
-        if not result.data:
-            return jsonify({"success": False, "error": "Failed to create user"}), 500
-
-        return jsonify({
-            "success": True,
-            "user": {
-                "id": result.data[0]["id"],
-                "email": email,
-                "registration_number": registration_number
-            }
-        })
-
-    except Exception as e:
-        print(f"Signup error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+# ✅ Login Route (Runs Scraper)
 @app.route("/login", methods=["POST"])
 def login():
     try:
         data = request.json
-        email = data.get("email")
-        password = data.get("password")
-
-        if not all([email, password]):
-            return jsonify({"success": False, "error": "Missing email or password"}), 400
-
+        email, password = data.get("email"), data.get("password")
         user = get_user_by_email(email)
-        if not user:
-            return jsonify({"success": False, "error": "User not found"}), 404
-
-        if not check_password_hash(user["password_hash"], password):
-            return jsonify({"success": False, "error": "Invalid password"}), 401
-
-        return jsonify({
-            "success": True,
-            "user": {
-                "id": user["id"],
-                "email": user["email"],
-                "registration_number": user["registration_number"]
-            }
-        })
+        if not user or not check_password_hash(user["password_hash"], password):
+            return jsonify({"success": False, "error": "Invalid credentials"}), 401
+        
+        auth_user_id = user["auth_user_id"]
+        threading.Thread(target=run_scraper, args=(email, password, auth_user_id)).start()
+        
+        return jsonify({"success": True, "user": {"id": auth_user_id, "email": email, "registration_number": user["registration_number"]}})
 
     except Exception as e:
-        print(f"Login error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# ✅ Fetch Attendance
 @app.route("/api/attendance", methods=["GET"])
 def get_attendance():
     try:
-        user_id = request.args.get("user_id")
-        if not user_id:
-            return jsonify({"success": False, "error": "User ID required"}), 400
+        print("📌 Step 1: Fetching attendance data...")  # Debugging
+        
+        token = request.headers.get("Authorization")
+        if not token:
+            print("❌ Error: No Authorization token provided!")
+            return jsonify({"success": False, "error": "Authentication required"}), 401
 
+        token = token.split(" ")[1]
+        print(f"📌 Step 2: Token received - {token[:20]}...")  # Only print part of token for security
+
+        auth_user = verify_token(token)
+        if not auth_user or "email" not in auth_user:
+            print("❌ Error: Invalid or expired token!")
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+
+        user_email = auth_user["email"]
+        print(f"📌 Step 3: Retrieved Email from Token - {user_email}")
+
+        # ✅ Fetch correct user_id from Supabase
+        user_query = supabase.table("users").select("id").eq("email", user_email).single().execute()
+        if "data" not in user_query or not user_query.data:
+            print("❌ Error: No matching user found in database!")
+            return jsonify({"success": False, "error": "User not found in database"}), 404
+
+        user_id = user_query.data["id"]
+        print(f"📌 Step 4: Matching User ID - {user_id}")
+
+        # ✅ Fetch attendance using the correct user_id
         response = supabase.table("attendance").select("*").eq("user_id", user_id).execute()
         
-        return jsonify({
-            "success": True,
-            "attendance": response.data or []
-        })
+        if "data" not in response or not response.data:
+            print("❌ Error: No attendance records found!")
+            return jsonify({"success": False, "attendance": []})  # Return empty attendance
+
+        print(f"📌 Step 5: Supabase Query Response - {response.data}")
+
+        return jsonify({"success": True, "attendance": response.data})
 
     except Exception as e:
-        print(f"Attendance error: {e}")
+        print(f"❌ Step 6: Attendance API Error - {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+# ✅ Start Server
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+
+
+
+
+
+
 
 
 
