@@ -1,188 +1,217 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from supabase import create_client, Client
-import os
-from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
-from datetime import datetime, timedelta
 import threading
-from scrape_attendance import run_scraper  # ensure run_scraper accepts (username, password)
+import time
+from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
 
 # Load environment variables
 load_dotenv()
+print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
+print("SUPABASE_KEY:", os.getenv("SUPABASE_KEY"))
 
-# Initialize Flask app
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={
+app.config['TIMEOUT'] = 30
+
+CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+        "origins": ["http://localhost:3000"],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+        "max_age": 3600
     }
 })
 
-# Supabase setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    print(f"Failed to initialize Supabase client: {e}")
+    raise
 
-# JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key")
-JWT_EXPIRATION = 24  # hours
+active_scrapers = {}
 
-def generate_token(user_data):
-    """Generate JWT token for user"""
-    payload = {
-        'email': user_data['email'],
-        'id': user_data['id'],  # NEW: include user id in token
-        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
-
-def verify_token(token):
-    """Verify JWT token"""
+def async_scraper(email, password):
+    """Run scraper in background."""
+    from scrape_attendance import run_scraper
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        print(f"Starting scraper for {email}")
+        success = run_scraper(email, password)
+        print(f"Scraper finished for {email} with success: {success}")
+        active_scrapers[email] = {"status": "completed" if success else "failed"}
     except Exception as e:
-        print(f"Token verification error: {e}")
-        return None
+        print(f"Scraper error for {email}: {e}")
+        active_scrapers[email] = {"status": "failed", "error": str(e)}
 
-def get_user_by_email(email):
-    """Fetch user from Supabase by email"""
-    try:
-        response = supabase.table("users").select("*").eq("email", email).single().execute()
-        return response.data
-    except Exception as e:
-        print(f"Error getting user: {e}")
-        return None
-
-@app.route("/api/health", methods=["GET"])
+@app.route("/health", methods=["GET"])
 def health_check():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy"}), 200
+    print("Health check endpoint hit")
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
 
-@app.route("/api/login", methods=["POST"])
+@app.route("/api/login", methods=["POST", "OPTIONS"])
 def login_route():
-    """Handle user login and start scraper"""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
     try:
-        data = request.json
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No data provided"}), 400
+
         email = data.get("email")
         password = data.get("password")
-        
         if not email or not password:
             return jsonify({"success": False, "error": "Email and password required"}), 400
-            
-        # Get user from database
-        user = get_user_by_email(email)
-        if not user or not check_password_hash(user["password_hash"], password):
-            return jsonify({"success": False, "error": "Invalid credentials"}), 401
-            
-        # Generate token with email and id
-        token = generate_token(user)
-        
-        # Start scraper in background with two arguments (email, password)
-        print(f"Starting scraper for user: {email}")
+
+        print(f"Login attempt for email: {email}")
+
+        # 1) Check if user exists by email
+        resp = supabase.table("users").select("*").eq("email", email).execute()
+        if not resp.data or len(resp.data) == 0:
+            # 2) Create new user with empty registration_number
+            new_user = {
+                "email": email,
+                "password_hash": generate_password_hash(password),
+                "registration_number": ""
+            }
+            insert_resp = supabase.table("users").insert(new_user).execute()
+            user = insert_resp.data[0]
+        else:
+            user = resp.data[0]
+            # 3) If password mismatch, update hash
+            if not check_password_hash(user["password_hash"], password):
+                new_hash = generate_password_hash(password)
+                supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
+                updated_resp = supabase.table("users").select("*").eq("id", user["id"]).execute()
+                user = updated_resp.data[0]
+
+        # 4) Generate token with user["id"]
+        token = jwt.encode({
+            "email": email,
+            "id": user["id"],
+            "exp": datetime.utcnow() + timedelta(hours=24)
+        }, os.getenv("JWT_SECRET", "default-secret-key"))
+
+        # 5) Start the scraper
         threading.Thread(
-            target=run_scraper,
+            target=async_scraper,
             args=(email, password),
             daemon=True
         ).start()
-        
+
         return jsonify({
             "success": True,
             "token": token,
-            "user": {
-                "email": email,
-                "id": user["id"]
-            }
+            "user": {"email": email, "id": user["id"]}
         })
-        
+
     except Exception as e:
         print(f"Login error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route("/api/attendance", methods=["GET"])
+@app.route("/api/attendance", methods=["GET", "OPTIONS"])
 def get_attendance():
-    """Fetch attendance data for user"""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
     try:
-        # Verify token
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"success": False, "error": "No token provided"}), 401
-            
+
         token = auth_header.split(" ")[1]
-        payload = verify_token(token)
-        if not payload:
+        try:
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            user_id = payload["id"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
             return jsonify({"success": False, "error": "Invalid token"}), 401
-            
-        # Get user's attendance using user id from token
-        user_id = payload["id"]
-        response = supabase.table("attendance").select("*").eq("user_id", user_id).execute()
-        
-        return jsonify({
-            "success": True,
-            "attendance": response.data or []
-        })
-        
+
+        # Query attendance by user_id
+        resp = supabase.table("attendance").select("*").eq("user_id", user_id).execute()
+        data = resp.data if resp.data else []
+        return jsonify({"success": True, "attendance": data}), 200
+
     except Exception as e:
         print(f"Error fetching attendance: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route("/api/register", methods=["POST"])
-def register():
-    """Register new user"""
+@app.route("/api/scraper-status", methods=["GET"])
+def get_scraper_status():
     try:
-        data = request.json
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"success": False, "error": "No token provided"}), 401
+
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            email = payload["email"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+
+        status = active_scrapers.get(email, {"status": "not_started"})
+        return jsonify({"success": True, "status": status})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/register", methods=["POST", "OPTIONS"])
+def register():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+    try:
+        data = request.get_json()
         email = data.get("email")
         password = data.get("password")
-        
+        print(f"Registration attempt for email: {email}")
         if not email or not password:
             return jsonify({"success": False, "error": "Email and password required"}), 400
-            
-        # Check if user exists
-        existing_user = get_user_by_email(email)
-        if existing_user:
+
+        # Check if user already exists
+        resp = supabase.table("users").select("*").eq("email", email).execute()
+        if resp.data and len(resp.data) > 0:
             return jsonify({"success": False, "error": "User already exists"}), 400
-            
-        # Create user
-        password_hash = generate_password_hash(password)
-        user_data = {
+
+        new_user = {
             "email": email,
-            "password_hash": password_hash
+            "password_hash": generate_password_hash(password),
+            "registration_number": ""
         }
-        
-        response = supabase.table("users").insert(user_data).execute()
-        
-        if "error" in response:
-            return jsonify({"success": False, "error": response["error"]}), 400
-            
-        # Generate token with email and id
-        token = generate_token({"email": email, "id": response.data[0]["id"]})
-        
+        insert_resp = supabase.table("users").insert(new_user).execute()
+        if not insert_resp.data:
+            return jsonify({"success": False, "error": "Failed to create user"}), 500
+
+        user = insert_resp.data[0]
+        token = jwt.encode({
+            "email": email,
+            "id": user["id"],
+            "exp": datetime.utcnow() + timedelta(hours=24)
+        }, os.getenv("JWT_SECRET", "default-secret-key"))
+
         return jsonify({
             "success": True,
             "token": token,
-            "user": {
-                "email": email,
-                "id": response.data[0]["id"]
-            }
+            "user": {"email": email, "id": user["id"]}
         })
-        
     except Exception as e:
         print(f"Registration error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
-
-
-
-
-
-
-
+    port = int(os.getenv("PORT", 5050))
+    print(f"Starting server on port {port}...")
+    app.run(host="0.0.0.0", port=port, debug=True, threaded=True)
 
 
 

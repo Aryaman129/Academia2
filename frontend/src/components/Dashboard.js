@@ -1,93 +1,185 @@
-"use client";
-import React, { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+"use client"
+import React, { useState, useEffect, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
+import axios from "axios"
+import LoadingIndicator from "./LoadingIndicator"
 
-const SUPABASE_URL = "https://zqzitiypvwexenxbkazf.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxeml0aXlwdndleGVueGJrYXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzMDg0NTIsImV4cCI6MjA1NTg4NDQ1Mn0.Vi_83ZUnK6NebdS1EX1xmH19rthwPAr5FMsqgnIQB30";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// IMPORTANT: Define the API URL
+const API_URL = "http://localhost:5050"
 
 const Dashboard = () => {
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const [attendanceData, setAttendanceData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [userEmail, setUserEmail] = useState("")
+  const navigate = useNavigate()
 
-  useEffect(() => {
-    const fetchAttendance = async () => {
-      setLoading(true);
-      try {
-        // ✅ Corrected Session Retrieval
-        const { data } = await supabase.auth.getSession();
-        console.log("📌 Supabase Session Data:", data); // Debugging
+  // Fetch attendance data (wrapped in useCallback to prevent useEffect issues)
+  const fetchAttendance = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
-        if (!data.session) {
-          throw new Error("Authentication required. Please login again.");
-        }
+    try {
+      // Get token from localStorage (set during login)
+      const token = localStorage.getItem("token")
+      const email = localStorage.getItem("userEmail")
 
-        // ✅ Corrected Token Retrieval
-        const token = data.session.access_token;
-        if (!token) {
-          throw new Error("Invalid session token.");
-        }
-        console.log("📌 Using Token:", token); // Debugging
-
-        // ✅ Fetch Attendance Data from Backend
-        const response = await axios.get("http://localhost:5000/api/attendance", {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        });
-
-        console.log("📌 Attendance API Response:", response.data); // Debugging
-
-        if (response.data.success) {
-          setAttendanceData(response.data.attendance);
-        } else {
-          throw new Error(response.data.error || "No attendance records found.");
-        }
-      } catch (err) {
-        console.error("Attendance fetch error:", err);
-        setError(err.message || "An error occurred while fetching attendance data.");
-        if (err.response?.status === 401) {
-          await supabase.auth.signOut();
-          navigate("/");
-        }
-      } finally {
-        setLoading(false);
+      if (!token) {
+        throw new Error("Authentication required. Please login again.")
       }
-    };
 
-    fetchAttendance();
-  }, [navigate]);
+      setUserEmail(email || "User")
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
+      console.log("Fetching attendance data...")
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
+      const response = await axios.get(`${API_URL}/api/attendance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      console.log("📌 Attendance API Response:", response.data)
+
+      if (response.data.success) {
+        setAttendanceData(response.data.attendance || [])
+      } else {
+        throw new Error(response.data.error || "No attendance records found.")
+      }
+    } catch (err) {
+      console.error("Attendance fetch error:", err)
+
+      if (err.response?.status === 401) {
+        setError("Your session has expired. Please login again.")
+        localStorage.removeItem("token")
+        setTimeout(() => navigate("/"), 3000)
+      } else {
+        setError(err.message || "An error occurred while fetching attendance data.")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [navigate]) // Added `useCallback` to memoize fetchAttendance
+
+  // Call fetchAttendance on component mount
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      navigate("/")
+      return
+    }
+
+    fetchAttendance()
+  }, [fetchAttendance, navigate]) // Added `fetchAttendance` to dependency array
+
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("userEmail")
+    localStorage.removeItem("userId")
+    navigate("/")
+  }
+
+  const handleRefresh = () => {
+    fetchAttendance()
+  }
+
+  if (loading) return <LoadingIndicator message="Fetching your attendance data..." />
+
+  if (error)
+    return (
+      <div className="container mx-auto p-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <strong>Error:</strong> {error}
+        </div>
+        <button onClick={() => navigate("/")} className="bg-blue-500 text-white px-4 py-2 rounded-md">
+          Back to Login
+        </button>
+      </div>
+    )
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Attendance Records</h1>
-      <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-md mb-4">
-        Logout
-      </button>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Attendance Dashboard</h1>
+          <p className="text-gray-600">Welcome, {userEmail}</p>
+        </div>
+        <div>
+          <button onClick={handleRefresh} className="bg-blue-500 text-white px-4 py-2 rounded-md mr-2">
+            Refresh Data
+          </button>
+          <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-md">
+            Logout
+          </button>
+        </div>
+      </div>
+
       {attendanceData.length > 0 ? (
-        <ul className="bg-white shadow-md rounded-lg p-4">
-          {attendanceData.map((record, index) => (
-            <li key={index} className="border-b py-2">
-              <span className="font-semibold">{record.course_code}:</span> {record.attendance_percentage}%
-            </li>
-          ))}
-        </ul>
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Course Code
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Course Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Faculty
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hours Conducted
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hours Absent
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Attendance %
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {attendanceData.map((record, index) => (
+                  <tr key={index} className={record.attendance_percentage < 75 ? "bg-red-100" : ""}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{record.course_code}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.course_title}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.faculty}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_conducted}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_absent}</td>
+                    <td
+                      className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
+                        record.attendance_percentage < 75 ? "text-red-600" : "text-green-600"
+                      }`}
+                    >
+                      {record.attendance_percentage}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
-        <p className="text-red-500 font-bold">No attendance records found.</p>
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+          <p className="font-medium">No attendance records found.</p>
+          <p className="text-sm mt-1">This could be because:</p>
+          <ul className="list-disc list-inside text-sm mt-1">
+            <li>Your data is still being fetched from the system</li>
+            <li>You haven't been registered for any courses yet</li>
+            <li>There was an issue with the data scraping process</li>
+          </ul>
+          <div className="mt-4">
+            <button onClick={handleRefresh} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
+              Try Again
+            </button>
+          </div>
+        </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default Dashboard;
+export default Dashboard
+
+
+
+
