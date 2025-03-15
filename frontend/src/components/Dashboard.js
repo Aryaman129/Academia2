@@ -8,36 +8,43 @@ import LoadingIndicator from "./LoadingIndicator"
 const API_URL = "http://localhost:5050"
 
 const Dashboard = () => {
+  // Attendance state
   const [attendanceData, setAttendanceData] = useState([])
+  // Timetable state
+  const [timetableData, setTimetableData] = useState({})
+  const [batch, setBatch] = useState("")
+  const [personalDetails, setPersonalDetails] = useState({})
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userEmail, setUserEmail] = useState("")
   const navigate = useNavigate()
-
-  // Fetch attendance data (wrapped in useCallback to prevent useEffect issues)
+  const parseTimeSlot = (timeSlot) => {
+    // Assumes timeSlot is in "HH:MM-HH:MM" format
+    let [start] = timeSlot.split("-");
+    let [hour, minute] = start.trim().split(":").map(Number);
+    // If the hour is less than 8, assume it's in the PM (e.g., 1:25 should be 13:25)
+    if (hour < 8) {
+      hour += 12;
+    }
+    return hour * 60 + minute;
+  };
+  
+  
+  // Fetch attendance data
   const fetchAttendance = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
     try {
-      // Get token from localStorage (set during login)
       const token = localStorage.getItem("token")
       const email = localStorage.getItem("userEmail")
-
       if (!token) {
         throw new Error("Authentication required. Please login again.")
       }
-
       setUserEmail(email || "User")
-
       console.log("Fetching attendance data...")
-
       const response = await axios.get(`${API_URL}/api/attendance`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
       console.log("📌 Attendance API Response:", response.data)
-
       if (response.data.success) {
         setAttendanceData(response.data.attendance || [])
       } else {
@@ -45,7 +52,6 @@ const Dashboard = () => {
       }
     } catch (err) {
       console.error("Attendance fetch error:", err)
-
       if (err.response?.status === 401) {
         setError("Your session has expired. Please login again.")
         localStorage.removeItem("token")
@@ -53,21 +59,47 @@ const Dashboard = () => {
       } else {
         setError(err.message || "An error occurred while fetching attendance data.")
       }
-    } finally {
-      setLoading(false)
     }
-  }, [navigate]) // Added `useCallback` to memoize fetchAttendance
+  }, [navigate])
 
-  // Call fetchAttendance on component mount
+  // Fetch timetable data
+  const fetchTimetable = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token")
+      // Assuming you stored the password during login, else adjust accordingly.
+      const password = localStorage.getItem("userPassword") || ""
+      if (!token) throw new Error("Authentication required. Please login again.")
+      console.log("Fetching timetable data...")
+      // Note: We are using axios.get with a 'data' property.
+      // If your backend requires POST for this endpoint, change to axios.post.
+      const response = await axios.get(`${API_URL}/api/timetable`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { password: password }
+      })
+      console.log("📌 Timetable API Response:", response.data)
+      if (response.data.success) {
+        setTimetableData(response.data.timetable || {})
+        setBatch(response.data.batch || "")
+        setPersonalDetails(response.data.personal_details || {})
+      } else {
+        throw new Error(response.data.error || "No timetable records found.")
+      }
+    } catch (err) {
+      console.error("Timetable fetch error:", err)
+      setError(err.message || "An error occurred while fetching timetable data.")
+    }
+  }, [])
+
+  // Fetch both timetable and attendance data on mount
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (!token) {
       navigate("/")
       return
     }
-
-    fetchAttendance()
-  }, [fetchAttendance, navigate]) // Added `fetchAttendance` to dependency array
+    // Fetch timetable and attendance concurrently
+    Promise.all([fetchTimetable(), fetchAttendance()]).then(() => setLoading(false))
+  }, [fetchAttendance, fetchTimetable, navigate])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -77,10 +109,11 @@ const Dashboard = () => {
   }
 
   const handleRefresh = () => {
-    fetchAttendance()
+    setLoading(true)
+    Promise.all([fetchTimetable(), fetchAttendance()]).then(() => setLoading(false))
   }
 
-  if (loading) return <LoadingIndicator message="Fetching your attendance data..." />
+  if (loading) return <LoadingIndicator message="Fetching your data..." />
 
   if (error)
     return (
@@ -98,7 +131,7 @@ const Dashboard = () => {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Attendance Dashboard</h1>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-gray-600">Welcome, {userEmail}</p>
         </div>
         <div>
@@ -111,75 +144,119 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {attendanceData.length > 0 ? (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Course Code
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Course Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Faculty
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Hours Conducted
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Hours Absent
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Attendance %
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {attendanceData.map((record, index) => (
-                  <tr key={index} className={record.attendance_percentage < 75 ? "bg-red-100" : ""}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{record.course_code}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.course_title}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.faculty}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_conducted}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_absent}</td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
-                        record.attendance_percentage < 75 ? "text-red-600" : "text-green-600"
-                      }`}
-                    >
-                      {record.attendance_percentage}%
-                    </td>
+
+      {/* Timetable Section */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-2">Timetable</h2>
+        {Object.keys(timetableData).length > 0 ? (
+          Object.entries(timetableData).map(([day, slots]) => (
+            <div key={day} className="bg-white shadow-md rounded-lg p-4 mb-4">
+              <h3 className="text-xl font-semibold mb-2">{day}</h3>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Time Slot</th>
+                    <th className="px-4 py-2 text-left">Course(s)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                {Object.entries(slots)
+                 .sort((a, b) => parseTimeSlot(a[0]) - parseTimeSlot(b[0]))
+                 .map(([timeSlot, slotInfo]) => (
+                   <tr key={timeSlot}>
+                     <td className="px-4 py-2">{timeSlot}</td>
+                     <td className="px-4 py-2">
+                       {slotInfo.courses && slotInfo.courses.length > 0
+                         ? slotInfo.courses.map((course, idx) => (
+                             <span key={idx}>
+                               {course.title}
+                               {idx < slotInfo.courses.length - 1 && ", "}
+                             </span>
+                           ))
+                         : slotInfo.original_slot || "Empty"}
+                     </td>
+                   </tr>
+                 ))}
+
+                </tbody>
+              </table>
+            </div>
+          ))
+        ) : (
+          <p>No timetable data found.</p>
+        )}
+      </div>
+
+      {/* Attendance Section */}
+      <div>
+        <h2 className="text-2xl font-bold mb-2">Attendance</h2>
+        {attendanceData.length > 0 ? (
+          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Course Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Course Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Faculty
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Hours Conducted
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Hours Absent
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Attendance %
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {attendanceData.map((record, index) => (
+                    <tr key={index} className={record.attendance_percentage < 75 ? "bg-red-100" : ""}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{record.course_code}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{record.course_title}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{record.faculty}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_conducted}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_absent}</td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
+                          record.attendance_percentage < 75 ? "text-red-600" : "text-green-600"
+                        }`}
+                      >
+                        {record.attendance_percentage}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-          <p className="font-medium">No attendance records found.</p>
-          <p className="text-sm mt-1">This could be because:</p>
-          <ul className="list-disc list-inside text-sm mt-1">
-            <li>Your data is still being fetched from the system</li>
-            <li>You haven't been registered for any courses yet</li>
-            <li>There was an issue with the data scraping process</li>
-          </ul>
-          <div className="mt-4">
-            <button onClick={handleRefresh} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
-              Try Again
-            </button>
+        ) : (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+            <p className="font-medium">No attendance records found.</p>
+            <p className="text-sm mt-1">This could be because:</p>
+            <ul className="list-disc list-inside text-sm mt-1">
+              <li>Your data is still being fetched from the system</li>
+              <li>You haven't been registered for any courses yet</li>
+              <li>There was an issue with the data scraping process</li>
+            </ul>
+            <div className="mt-4">
+              <button onClick={handleRefresh} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
+                Try Again
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
 
 export default Dashboard
-
-
-
 

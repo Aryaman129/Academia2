@@ -11,8 +11,10 @@ from supabase import create_client, Client
 
 # Load environment variables
 load_dotenv()
-print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
-print("SUPABASE_KEY:", os.getenv("SUPABASE_KEY"))
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
 app.config['TIMEOUT'] = 30
@@ -49,6 +51,23 @@ def async_scraper(email, password):
     except Exception as e:
         print(f"Scraper error for {email}: {e}")
         active_scrapers[email] = {"status": "failed", "error": str(e)}
+
+def async_timetable_scraper(email, password):
+    """Run timetable scraper in background."""
+    from scrape_timetable import main_flow
+    try:
+        print(f"Starting timetable scraper for {email}")
+        driver_path = os.getenv("CHROMEDRIVER_PATH", r"C:\Users\Lenovo\Desktop\Academia2\Academia2\chromedriver-win64\chromedriver.exe")
+        result = main_flow(email, password, driver_path=driver_path)
+        success = result["status"] == "success"
+        print(f"Timetable scraper finished for {email} with success: {success}")
+        active_scrapers[f"timetable_{email}"] = {
+            "status": "completed" if success else "failed",
+            "result": result
+        }
+    except Exception as e:
+        print(f"Timetable scraper error for {email}: {e}")
+        active_scrapers[f"timetable_{email}"] = {"status": "failed", "error": str(e)}
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -101,9 +120,16 @@ def login_route():
             "exp": datetime.utcnow() + timedelta(hours=24)
         }, os.getenv("JWT_SECRET", "default-secret-key"))
 
-        # 5) Start the scraper
+        # 5) Start the attendance scraper
         threading.Thread(
             target=async_scraper,
+            args=(email, password),
+            daemon=True
+        ).start()
+        
+        # 6) Start the timetable scraper in parallel
+        threading.Thread(
+            target=async_timetable_scraper,
             args=(email, password),
             daemon=True
         ).start()
@@ -145,6 +171,126 @@ def get_attendance():
         print(f"Error fetching attendance: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route("/api/timetable", methods=["GET", "OPTIONS", "POST"])
+def get_user_timetable():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+
+    try:
+        # 1) Validate token from the Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"success": False, "error": "No token provided"}), 401
+
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            user_id = payload["id"]
+            email = payload["email"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+
+        # 2) Check if we should use cached timetable data or fetch new data
+        if request.method == "GET":
+            # Try to get cached timetable data first
+            tt_resp = supabase.table("timetable").select("*").eq("user_id", user_id).execute()
+            if tt_resp.data and len(tt_resp.data) > 0:
+                timetable_data = tt_resp.data[0]
+                return jsonify({
+                    "success": True,
+                    "timetable": timetable_data["timetable_data"],
+                    "batch": timetable_data["batch"],
+                    "personal_details": timetable_data["personal_details"]
+                }), 200
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "No timetable data available. Please refresh with password."
+                }), 404
+        
+        # 3) If POST, get password and refresh timetable data
+        if request.method == "POST":
+            # Get the password from the request body
+            data = request.get_json() or {}
+            password = data.get("password")
+            if not password:
+                return jsonify({"success": False, "error": "Password required for timetable access"}), 400
+
+            # Check timetable scraper status
+            scraper_key = f"timetable_{email}"
+            if scraper_key in active_scrapers and active_scrapers[scraper_key]["status"] == "completed":
+                result = active_scrapers[scraper_key].get("result", {})
+                if result.get("status") == "success":
+                    return jsonify({
+                        "success": True,
+                        "timetable": result["merged_timetable"],
+                        "batch": result["batch"],
+                        "personal_details": result["personal_details"]
+                    }), 200
+            
+            # Start a new scraper if none is running or previous one failed
+            if scraper_key not in active_scrapers or active_scrapers[scraper_key]["status"] != "running":
+                active_scrapers[scraper_key] = {"status": "running"}
+                # Run in a separate thread to avoid blocking
+                threading.Thread(
+                    target=async_timetable_scraper,
+                    args=(email, password),
+                    daemon=True
+                ).start()
+                
+                return jsonify({
+                    "success": True,
+                    "message": "Timetable scraper started. Please check status endpoint."
+                }), 202
+            else:
+                return jsonify({
+                    "success": True,
+                    "message": "Timetable scraper already running. Please wait."
+                }), 202
+
+    except Exception as e:
+        print(f"Error in timetable endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/timetable-status", methods=["GET"])
+def get_timetable_status():
+    try:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"success": False, "error": "No token provided"}), 401
+
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            email = payload["email"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+
+        scraper_key = f"timetable_{email}"
+        status = active_scrapers.get(scraper_key, {"status": "not_started"})
+        
+        # If scraper completed, return the results too
+        if status.get("status") == "completed" and "result" in status:
+            result = status["result"]
+            if result["status"] == "success":
+                return jsonify({
+                    "success": True,
+                    "status": status["status"],
+                    "timetable": result["merged_timetable"],
+                    "batch": result["batch"],
+                    "personal_details": result["personal_details"]
+                })
+        
+        return jsonify({"success": True, "status": status})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route("/api/scraper-status", methods=["GET"])
 def get_scraper_status():
     try:
@@ -165,6 +311,7 @@ def get_scraper_status():
         return jsonify({"success": True, "status": status})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route("/api/register", methods=["POST", "OPTIONS"])
 def register():

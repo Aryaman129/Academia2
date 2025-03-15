@@ -1,0 +1,668 @@
+{
+  "status": "success",
+  "batch": "Batch 2",
+  "merged_timetable": {
+    "Day 1": {
+      "08:00-08:50": {
+        "display": "",
+        "original_slot": "P1-",
+        "courses": [],
+        "time": "08:00-08:50"
+      },
+      "08:50-09:40": {
+        "time": "08:50-09:40",
+        "original_slot": "P2-/X",
+        "courses": [],
+        "display": ""
+      },
+      "09:45-10:35": {
+        "time": "09:45-10:35",
+        "original_slot": "P3-/X",
+        "courses": [],
+        "display": ""
+      },
+      "10:40-11:30": {
+        "display": "",
+        "original_slot": "P4-",
+        "courses": [],
+        "time": "10:40-11:30"
+      },
+      "11:35-12:25": {
+        "display": "",
+        "original_slot": "P5-",
+        "courses": [],
+        "time": "11:35-12:25"
+      },
+      "12:30-01:20": {
+        "display": "",
+        "original_slot": "A",
+        "courses": [],
+        "time": "12:30-01:20"
+      },
+      "01:25-02:15": {
+        "display": "",
+        "original_slot": "A",
+        "courses": [],
+        "time": "01:25-02:15"
+      },
+      "02:20-03:10": {
+        "display": "",
+        "original_slot": "F",
+        "courses": [],
+        "time": "02:20-03:10"
+      },
+      "03:10-04:00": {
+        "display": "",
+        "original_slot": "F",
+        "courses": [],
+        "time": "03:10-04:00"
+      },
+      "04:00-04:50": {
+        "display": "Object Oriented Design and Programming (04:00-04:50)",
+        "original_slot": "G",
+        "courses": [
+          {
+            "title": "Object Oriented Design and Programming",
+            "faculty": "Dr.Jagadeesh M (103376)",
+            "room": "AY2024-25-EVEN",
+            "code": "21CSC101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "04:00-04:50"
+      },
+      "04:50-05:30": {
+        "display": "",
+        "original_slot": "L11",
+        "courses": [],
+        "time": "04:50-05:30"
+      },
+      "05:30-06:10": {
+        "display": "",
+        "original_slot": "L12",
+        "courses": [],
+        "time": "05:30-06:10"
+      }
+    },
+    "Day 2": {
+      "08:00-08:50": {
+        "display": "Semiconductor Physics and Computational Methods (08:00-08:50)",
+        "original_slot": "B",
+        "courses": [
+          {
+            "title": "Semiconductor Physics and Computational Methods",
+            "faculty": "Dr. Ganesh Vattikondala (102648)",
+            "room": "AY2024-25-EVEN",
+            "code": "21PYB102J",
+            "type": "Lab Based Theory"
+          }
+        ],
+        "time": "08:00-08:50"
+      },
+      "08:50-09:40": {
+        "display": "Semiconductor Physics and Computational Methods (08:50-09:40)",
+        "original_slot": "B/X",
+        "courses": [
+          {
+            "title": "Semiconductor Physics and Computational Methods",
+            "faculty": "Dr. Ganesh Vattikondala (102648)",
+            "room": "AY2024-25-EVEN",
+            "code": "21PYB102J",
+            "type": "Lab Based Theory"
+          }
+        ],
+        "time": "08:50-09:40"
+      },
+      "09:45-10:35": {
+        "display": "Object Oriented Design and Programming (09:45-10:35)",
+        "original_slot": "G/X",
+        "courses": [
+          {
+            "title": "Object Oriented Design and Programming",
+            "faculty": "Dr.Jagadeesh M (103376)",
+            "room": "AY2024-25-EVEN",
+            "code": "21CSC101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "09:45-10:35"
+      },
+      "10:40-11:30": {
+        "display": "Object Oriented Design and Programming (10:40-11:30)",
+        "original_slot": "G",
+        "courses": [
+          {
+            "title": "Object Oriented Design and Programming",
+            "faculty": "Dr.Jagadeesh M (103376)",
+            "room": "AY2024-25-EVEN",
+            "code": "21CSC101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "10:40-11:30"
+      },
+      "11:35-12:25": {
+        "display": "",
+        "original_slot": "A",
+        "courses": [],
+        "time": "11:35-12:25"
+      },
+      "12:30-01:20": {
+        "display": "",
+        "original_slot": "P16-",
+        "courses": [],
+        "time": "12:30-01:20"
+      },
+      "01:25-02:15": {
+        "display": "",
+        "original_slot": "P17-",
+        "courses": [],
+        "time": "01:25-02:15"
+      },
+      "02:20-03:10": {
+        "display": "",
+        "original_slot": "P18-",
+        "courses": [],
+        "time": "02:20-03:10"
+      },
+      "03:10-04:00": {
+        "display": "",
+        "original_slot": "P19-",
+        "courses": [],
+        "time": "03:10-04:00"
+      },
+      "04:00-04:50": {
+        "display": "",
+        "original_slot": "P20-",
+        "courses": [],
+        "time": "04:00-04:50"
+      },
+      "04:50-05:30": {
+        "display": "",
+        "original_slot": "L21",
+        "courses": [],
+        "time": "04:50-05:30"
+      },
+      "05:30-06:10": {
+        "display": "",
+        "original_slot": "L22",
+        "courses": [],
+        "time": "05:30-06:10"
+      }
+    },
+    "Day 3": {
+      "08:00-08:50": {
+        "display": "Semiconductor Physics and Computational Methods (08:00-08:50)",
+        "original_slot": "P21-",
+        "courses": [
+          {
+            "title": "Semiconductor Physics and Computational Methods",
+            "faculty": "Dr. Ganesh Vattikondala (102648)",
+            "room": "AY2024-25-EVEN",
+            "code": "21PYB102J",
+            "type": "Lab Based Theory"
+          }
+        ],
+        "time": "08:00-08:50"
+      },
+      "08:50-09:40": {
+        "display": "Semiconductor Physics and Computational Methods (08:50-09:40)",
+        "original_slot": "P22-/X",
+        "courses": [
+          {
+            "title": "Semiconductor Physics and Computational Methods",
+            "faculty": "Dr. Ganesh Vattikondala (102648)",
+            "room": "AY2024-25-EVEN",
+            "code": "21PYB102J",
+            "type": "Lab Based Theory"
+          }
+        ],
+        "time": "08:50-09:40"
+      },
+      "09:45-10:35": {
+        "time": "09:45-10:35",
+        "original_slot": "P23-/X",
+        "courses": [],
+        "display": ""
+      },
+      "10:40-11:30": {
+        "display": "",
+        "original_slot": "P24-",
+        "courses": [],
+        "time": "10:40-11:30"
+      },
+      "11:35-12:25": {
+        "display": "",
+        "original_slot": "P25-",
+        "courses": [],
+        "time": "11:35-12:25"
+      },
+      "12:30-01:20": {
+        "display": "Electrical and Electronics Engineering (12:30-01:20)",
+        "original_slot": "C",
+        "courses": [
+          {
+            "title": "Electrical and Electronics Engineering",
+            "faculty": "Dr.R.C.Ilambirai (100311)",
+            "room": "AY2024-25-EVEN",
+            "code": "21EES101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "12:30-01:20"
+      },
+      "01:25-02:15": {
+        "display": "Electrical and Electronics Engineering (01:25-02:15)",
+        "original_slot": "C",
+        "courses": [
+          {
+            "title": "Electrical and Electronics Engineering",
+            "faculty": "Dr.R.C.Ilambirai (100311)",
+            "room": "AY2024-25-EVEN",
+            "code": "21EES101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "01:25-02:15"
+      },
+      "02:20-03:10": {
+        "display": "",
+        "original_slot": "A",
+        "courses": [],
+        "time": "02:20-03:10"
+      },
+      "03:10-04:00": {
+        "display": "Advanced Calculus and Complex Analysis (03:10-04:00)",
+        "original_slot": "D",
+        "courses": [
+          {
+            "title": "Advanced Calculus and Complex Analysis",
+            "faculty": "Dr.J.Sasikumar (100416)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MAB102T",
+            "type": "Theory"
+          }
+        ],
+        "time": "03:10-04:00"
+      },
+      "04:00-04:50": {
+        "display": "Semiconductor Physics and Computational Methods (04:00-04:50)",
+        "original_slot": "B",
+        "courses": [
+          {
+            "title": "Semiconductor Physics and Computational Methods",
+            "faculty": "Dr. Ganesh Vattikondala (102648)",
+            "room": "AY2024-25-EVEN",
+            "code": "21PYB102J",
+            "type": "Lab Based Theory"
+          }
+        ],
+        "time": "04:00-04:50"
+      },
+      "04:50-05:30": {
+        "display": "",
+        "original_slot": "L31",
+        "courses": [],
+        "time": "04:50-05:30"
+      },
+      "05:30-06:10": {
+        "display": "",
+        "original_slot": "L32",
+        "courses": [],
+        "time": "05:30-06:10"
+      }
+    },
+    "Day 4": {
+      "08:00-08:50": {
+        "display": "Advanced Calculus and Complex Analysis (08:00-08:50)",
+        "original_slot": "D",
+        "courses": [
+          {
+            "title": "Advanced Calculus and Complex Analysis",
+            "faculty": "Dr.J.Sasikumar (100416)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MAB102T",
+            "type": "Theory"
+          }
+        ],
+        "time": "08:00-08:50"
+      },
+      "08:50-09:40": {
+        "display": "Advanced Calculus and Complex Analysis (08:50-09:40)",
+        "original_slot": "D/X",
+        "courses": [
+          {
+            "title": "Advanced Calculus and Complex Analysis",
+            "faculty": "Dr.J.Sasikumar (100416)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MAB102T",
+            "type": "Theory"
+          }
+        ],
+        "time": "08:50-09:40"
+      },
+      "09:45-10:35": {
+        "display": "Semiconductor Physics and Computational Methods (09:45-10:35)",
+        "original_slot": "B/X",
+        "courses": [
+          {
+            "title": "Semiconductor Physics and Computational Methods",
+            "faculty": "Dr. Ganesh Vattikondala (102648)",
+            "room": "AY2024-25-EVEN",
+            "code": "21PYB102J",
+            "type": "Lab Based Theory"
+          }
+        ],
+        "time": "09:45-10:35"
+      },
+      "10:40-11:30": {
+        "display": "Communicative English (10:40-11:30)",
+        "original_slot": "E",
+        "courses": [
+          {
+            "title": "Communicative English",
+            "faculty": "Dr.Arul Dayanand.S (102902)",
+            "room": "AY2024-25-EVEN",
+            "code": "21LEH101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "10:40-11:30"
+      },
+      "11:35-12:25": {
+        "display": "Electrical and Electronics Engineering (11:35-12:25)",
+        "original_slot": "C",
+        "courses": [
+          {
+            "title": "Electrical and Electronics Engineering",
+            "faculty": "Dr.R.C.Ilambirai (100311)",
+            "room": "AY2024-25-EVEN",
+            "code": "21EES101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "11:35-12:25"
+      },
+      "12:30-01:20": {
+        "display": "",
+        "original_slot": "P36-",
+        "courses": [],
+        "time": "12:30-01:20"
+      },
+      "01:25-02:15": {
+        "display": "Engineering Graphics and Design (01:25-02:15)",
+        "original_slot": "P37-",
+        "courses": [
+          {
+            "title": "Engineering Graphics and Design",
+            "faculty": "Dr. Ganesh Kumar P (102929)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MES102L",
+            "type": "Practical"
+          }
+        ],
+        "time": "01:25-02:15"
+      },
+      "02:20-03:10": {
+        "display": "Engineering Graphics and Design (02:20-03:10)",
+        "original_slot": "P38-",
+        "courses": [
+          {
+            "title": "Engineering Graphics and Design",
+            "faculty": "Dr. Ganesh Kumar P (102929)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MES102L",
+            "type": "Practical"
+          }
+        ],
+        "time": "02:20-03:10"
+      },
+      "03:10-04:00": {
+        "display": "Engineering Graphics and Design (03:10-04:00)",
+        "original_slot": "P39-",
+        "courses": [
+          {
+            "title": "Engineering Graphics and Design",
+            "faculty": "Dr. Ganesh Kumar P (102929)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MES102L",
+            "type": "Practical"
+          }
+        ],
+        "time": "03:10-04:00"
+      },
+      "04:00-04:50": {
+        "display": "Engineering Graphics and Design (04:00-04:50)",
+        "original_slot": "P40-",
+        "courses": [
+          {
+            "title": "Engineering Graphics and Design",
+            "faculty": "Dr. Ganesh Kumar P (102929)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MES102L",
+            "type": "Practical"
+          }
+        ],
+        "time": "04:00-04:50"
+      },
+      "04:50-05:30": {
+        "display": "",
+        "original_slot": "L41",
+        "courses": [],
+        "time": "04:50-05:30"
+      },
+      "05:30-06:10": {
+        "display": "",
+        "original_slot": "L42",
+        "courses": [],
+        "time": "05:30-06:10"
+      }
+    },
+    "Day 5": {
+      "08:00-08:50": {
+        "display": "",
+        "original_slot": "P41-",
+        "courses": [],
+        "time": "08:00-08:50"
+      },
+      "08:50-09:40": {
+        "display": "Environmental Science (08:50-09:40)",
+        "original_slot": "P42-/X",
+        "courses": [
+          {
+            "title": "Environmental Science",
+            "faculty": "Dr.S.Devikala (100123)",
+            "room": "AY2024-25-EVEN",
+            "code": "21CYM101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "08:50-09:40"
+      },
+      "09:45-10:35": {
+        "time": "09:45-10:35",
+        "original_slot": "P43-/X",
+        "courses": [],
+        "display": ""
+      },
+      "10:40-11:30": {
+        "display": "Constitution of India (10:40-11:30)",
+        "original_slot": "P44-",
+        "courses": [
+          {
+            "title": "Constitution of India",
+            "faculty": "Dr. Prasanth P S (103152)",
+            "room": "AY2024-25-EVEN",
+            "code": "21LEM101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "10:40-11:30"
+      },
+      "11:35-12:25": {
+        "display": "",
+        "original_slot": "P45-",
+        "courses": [],
+        "time": "11:35-12:25"
+      },
+      "12:30-01:20": {
+        "display": "Communicative English (12:30-01:20)",
+        "original_slot": "E",
+        "courses": [
+          {
+            "title": "Communicative English",
+            "faculty": "Dr.Arul Dayanand.S (102902)",
+            "room": "AY2024-25-EVEN",
+            "code": "21LEH101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "12:30-01:20"
+      },
+      "01:25-02:15": {
+        "display": "Communicative English (01:25-02:15)",
+        "original_slot": "E",
+        "courses": [
+          {
+            "title": "Communicative English",
+            "faculty": "Dr.Arul Dayanand.S (102902)",
+            "room": "AY2024-25-EVEN",
+            "code": "21LEH101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "01:25-02:15"
+      },
+      "02:20-03:10": {
+        "display": "Electrical and Electronics Engineering (02:20-03:10)",
+        "original_slot": "C",
+        "courses": [
+          {
+            "title": "Electrical and Electronics Engineering",
+            "faculty": "Dr.R.C.Ilambirai (100311)",
+            "room": "AY2024-25-EVEN",
+            "code": "21EES101T",
+            "type": "Theory"
+          }
+        ],
+        "time": "02:20-03:10"
+      },
+      "03:10-04:00": {
+        "display": "",
+        "original_slot": "F",
+        "courses": [],
+        "time": "03:10-04:00"
+      },
+      "04:00-04:50": {
+        "display": "Advanced Calculus and Complex Analysis (04:00-04:50)",
+        "original_slot": "D",
+        "courses": [
+          {
+            "title": "Advanced Calculus and Complex Analysis",
+            "faculty": "Dr.J.Sasikumar (100416)",
+            "room": "AY2024-25-EVEN",
+            "code": "21MAB102T",
+            "type": "Theory"
+          }
+        ],
+        "time": "04:00-04:50"
+      },
+      "04:50-05:30": {
+        "display": "",
+        "original_slot": "L51",
+        "courses": [],
+        "time": "04:50-05:30"
+      },
+      "05:30-06:10": {
+        "display": "",
+        "original_slot": "L52",
+        "courses": [],
+        "time": "05:30-06:10"
+      }
+    }
+  },
+  "personal_details": null,
+  "course_data": [
+    {
+      "course_code": "21PYB102J",
+      "course_title": "Semiconductor Physics and Computational Methods",
+      "slot": "B",
+      "gcr_code": "1011",
+      "faculty_name": "Dr. Ganesh Vattikondala (102648)",
+      "course_type": "Lab Based Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21EES101T",
+      "course_title": "Electrical and Electronics Engineering",
+      "slot": "C",
+      "gcr_code": "1011",
+      "faculty_name": "Dr.R.C.Ilambirai (100311)",
+      "course_type": "Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21MAB102T",
+      "course_title": "Advanced Calculus and Complex Analysis",
+      "slot": "D",
+      "gcr_code": "1011",
+      "faculty_name": "Dr.J.Sasikumar (100416)",
+      "course_type": "Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21LEH101T",
+      "course_title": "Communicative English",
+      "slot": "E",
+      "gcr_code": "1011",
+      "faculty_name": "Dr.Arul Dayanand.S (102902)",
+      "course_type": "Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21CSC101T",
+      "course_title": "Object Oriented Design and Programming",
+      "slot": "G",
+      "gcr_code": "1011",
+      "faculty_name": "Dr.Jagadeesh M (103376)",
+      "course_type": "Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21MES102L",
+      "course_title": "Engineering Graphics and Design",
+      "slot": "P37-P38-P39-P40-",
+      "gcr_code": "BEL401",
+      "faculty_name": "Dr. Ganesh Kumar P (102929)",
+      "course_type": "Practical",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21CYM101T",
+      "course_title": "Environmental Science",
+      "slot": "P42-",
+      "gcr_code": "Online",
+      "faculty_name": "Dr.S.Devikala (100123)",
+      "course_type": "Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21LEM101T",
+      "course_title": "Constitution of India",
+      "slot": "P44-",
+      "gcr_code": "ONLINE",
+      "faculty_name": "Dr. Prasanth P S (103152)",
+      "course_type": "Theory",
+      "room_no": "AY2024-25-EVEN"
+    },
+    {
+      "course_code": "21PYB102J",
+      "course_title": "Semiconductor Physics and Computational Methods",
+      "slot": "P21-P22-",
+      "gcr_code": "UB615",
+      "faculty_name": "Dr. Ganesh Vattikondala (102648)",
+      "course_type": "Lab Based Theory",
+      "room_no": "AY2024-25-EVEN"
+    }
+  ]
+}
