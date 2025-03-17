@@ -1,0 +1,314 @@
+.dashboard-container {
+    min-height: 100vh;
+    background-color: #0a0a0a;
+    color: #ffffff;
+  }
+  
+  .dashboard-header {
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+    padding: 1rem;
+  }
+  
+  .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .header-title h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  
+  .user-email {
+    color: #666;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .search-container {
+    position: relative;
+  }
+  
+  .search-input {
+    background-color: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    color: white;
+    width: 250px;
+  }
+  
+  .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+  }
+  
+  .action-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  
+  .action-button.refresh {
+    background-color: #2563eb;
+    color: white;
+  }
+  
+  .action-button.logout {
+    background-color: #dc2626;
+    color: white;
+  }
+  
+  .dashboard-main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  
+  .tab-navigation {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  
+  .tab-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  
+  .tab-button.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+  
+  /* Timetable Styles */
+  .timetable-container {
+    background-color: #1a1a1a;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+  }
+  
+  .timetable-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .day-navigation {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .nav-button {
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    color: #666;
+    transition: all 0.2s;
+  }
+  
+  .nav-button:hover {
+    color: white;
+    background-color: #2a2a2a;
+  }
+  
+  .time-slot-card {
+    display: flex;
+    padding: 1rem;
+    background-color: #2a2a2a;
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s;
+  }
+  
+  .time-slot-card:hover {
+    background-color: #3a3a3a;
+  }
+  
+  .time-slot {
+    width: 8rem;
+    font-weight: 500;
+  }
+  
+  .slot-content {
+    flex: 1;
+  }
+  
+  .course-info {
+    margin-bottom: 0.5rem;
+  }
+  
+  .course-title {
+    font-weight: 500;
+  }
+  
+  .course-details {
+    color: #666;
+    font-size: 0.875rem;
+  }
+  
+  /* Attendance Styles */
+  .attendance-container {
+    display: grid;
+    gap: 1.5rem;
+  }
+  
+  .overall-attendance {
+    background-color: #1a1a1a;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+  }
+  
+  .attendance-percentage {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: #2563eb;
+  }
+  
+  .attendance-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .attendance-card {
+    background-color: #1a1a1a;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    border-left: 4px solid;
+  }
+  
+  .attendance-card.low-attendance {
+    border-left-color: #dc2626;
+  }
+  
+  .attendance-card.good-attendance {
+    border-left-color: #16a34a;
+  }
+  
+  .card-header h3 {
+    font-size: 1.125rem;
+    font-weight: 500;
+    margin: 0;
+  }
+  
+  .course-code {
+    color: #666;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+  
+  .attendance-stats {
+    margin-top: 1rem;
+  }
+  
+  .percentage {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+  }
+  
+  .percentage .value {
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+  
+  .percentage .label {
+    color: #666;
+    font-size: 0.875rem;
+  }
+  
+  .progress-bar {
+    height: 0.5rem;
+    background-color: #2a2a2a;
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  
+  .progress {
+    height: 100%;
+    transition: width 0.3s ease;
+  }
+  
+  .low-attendance .progress {
+    background-color: #dc2626;
+  }
+  
+  .good-attendance .progress {
+    background-color: #16a34a;
+  }
+  
+  .status-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+  }
+  
+  .low-attendance .status-message {
+    background-color: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    color: #ef4444;
+  }
+  
+  .good-attendance .status-message {
+    background-color: rgba(22, 163, 74, 0.1);
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    color: #22c55e;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+    }
+  
+    .header-actions {
+      width: 100%;
+      flex-direction: column;
+    }
+  
+    .search-container {
+      width: 100%;
+    }
+  
+    .search-input {
+      width: 100%;
+    }
+  
+    .attendance-cards {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  

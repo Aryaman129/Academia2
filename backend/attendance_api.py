@@ -162,14 +162,64 @@ def get_attendance():
         except jwt.InvalidTokenError:
             return jsonify({"success": False, "error": "Invalid token"}), 401
 
-        # Query attendance by user_id
-        resp = supabase.table("attendance").select("*").eq("user_id", user_id).execute()
-        data = resp.data if resp.data else []
-        return jsonify({"success": True, "attendance": data}), 200
-
+        # Try to fetch attendance record for the user
+        resp = supabase.table("attendance").select("attendance_data").eq("user_id", user_id).execute()
+        if resp.data and len(resp.data) > 0:
+            attendance_data = resp.data[0].get("attendance_data", {})
+            return jsonify({"success": True, "attendance": attendance_data}), 200
+        else:
+            # If no attendance record exists, insert a new record using your upsert logic.
+            # In a real scenario, you might trigger the scraper instead of inserting empty data.
+            # For demonstration, we create a record with the scraped data.
+            # (Ideally, the scraper would have run and inserted the data already.)
+            default_attendance = {
+                "registration_number": "", 
+                "last_updated": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                "records": []  # Or scraped records if available
+            }
+            in_resp = supabase.table("attendance").insert({
+                "user_id": user_id,
+                "attendance_data": default_attendance
+            }).execute()
+            if in_resp.data:
+                return jsonify({"success": True, "attendance": default_attendance}), 200
+            else:
+                return jsonify({"success": False, "error": "Failed to create attendance record."}), 500
     except Exception as e:
         print(f"Error fetching attendance: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+    
+
+@app.route("/api/marks", methods=["GET", "OPTIONS"])
+def get_marks():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+    try:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"success": False, "error": "No token provided"}), 401
+
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            user_id = payload["id"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+
+        resp = supabase.table("marks").select("marks_data").eq("user_id", user_id).execute()
+        if resp.data and len(resp.data) > 0:
+            marks_data = resp.data[0].get("marks_data", {})
+            return jsonify({"success": True, "marks": marks_data}), 200
+        else:
+            return jsonify({"success": False, "error": "No marks data found."}), 404
+    except Exception as e:
+        print(f"Error fetching marks: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
 
 @app.route("/api/timetable", methods=["GET", "OPTIONS", "POST"])
 def get_user_timetable():

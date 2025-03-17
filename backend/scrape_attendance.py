@@ -11,6 +11,19 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
 from werkzeug.security import generate_password_hash
+from dotenv import load_dotenv
+# import tensorflow.lite as tflite
+
+#options = tflite.InterpreterOptions()
+# options.experimental_enable_delegate_fallback = True  # Fallback if XNNPACK fails
+
+# interpreter = tflite.Interpreter(model_path="your_model.tflite", options=options)
+# interpreter.allocate_tensors()
+
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 # ====== Supabase Configuration ======
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -30,6 +43,7 @@ chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--window-size=1920,1080")
 chrome_options.add_argument("--ignore-certificate-errors")
 chrome_options.add_argument("--allow-running-insecure-content")
+chrome_options.add_argument("--disable-blink-features=AutomationControlled")
 
 print("✅ (scrape_attendance) Module loaded. No global driver created.")
 time.sleep(1)
@@ -137,100 +151,260 @@ def parse_and_save_attendance(html, driver):
         return False
     print(f"📌 Extracted Registration Number: {registration_number}")
 
-    # Get the user id by email; update the user record with the scraped registration number if needed.
+    # Get or create the user in Supabase
     user_id = get_user_id(registration_number, username)
     if not user_id:
         print("❌ Could not retrieve or create user in Supabase.")
         return False
 
-    # Find the attendance table in the page
-    attendance_table = None
-    for table in soup.find_all("table"):
-        if "Course Code" in table.text:
-            attendance_table = table
-            break
-    if not attendance_table:
+    # Extract all attendance tables from the page
+    attendance_tables = [table for table in soup.find_all("table") if "Course Code" in table.text]
+    if not attendance_tables:
         print("❌ No attendance table found!")
         return False
 
-    rows = attendance_table.find_all("tr")[1:]
-    print(f"🔍 Found {len(rows)} rows in attendance table.")
+    # Collect attendance records from all tables
     attendance_records = []
+    for attendance_table in attendance_tables:
+        rows = attendance_table.find_all("tr")[1:]  # skip header row
+        for row in rows:
+            cols = row.find_all("td")
+            if len(cols) >= 8:
+                try:
+                    record = {
+                        "course_code": cols[0].text.strip(),
+                        "course_title": cols[1].text.strip(),
+                        "category": cols[2].text.strip(),
+                        "faculty": cols[3].text.strip(),
+                        "slot": cols[4].text.strip(),
+                        "hours_conducted": int(cols[5].text.strip()) if cols[5].text.strip().isdigit() else 0,
+                        "hours_absent": int(cols[6].text.strip()) if cols[6].text.strip().isdigit() else 0,
+                        "attendance_percentage": float(cols[7].text.strip()) if cols[7].text.strip().replace('.', '', 1).isdigit() else 0.0
+                    }
+                    attendance_records.append(record)
+                except Exception as ex:
+                    print(f"⚠️ Error parsing row: {ex}")
 
-    # Build attendance records for each row
-    for row in rows:
-        cols = row.find_all("td")
-        if len(cols) >= 8 and "Course Code" not in cols[0].text.strip():
-            try:
-                record = {
-                    "user_id": user_id,
-                    "registration_number": registration_number,
-                    "course_code": cols[0].text.strip(),
-                    "course_title": cols[1].text.strip(),
-                    "category": cols[2].text.strip(),
-                    "faculty": cols[3].text.strip(),
-                    "slot": cols[4].text.strip(),
-                    "hours_conducted": int(cols[5].text.strip()) if cols[5].text.strip().isdigit() else 0,
-                    "hours_absent": int(cols[6].text.strip()) if cols[6].text.strip().isdigit() else 0,
-                    "attendance_percentage": float(cols[7].text.strip()) if cols[7].text.strip().replace('.', '', 1).isdigit() else 0.0
-                }
-                attendance_records.append(record)
-            except Exception as ex:
-                print(f"⚠️ Error parsing row: {ex}")
-
-    # Deduplicate records based on (registration_number, course_code)
+    # Optional: Deduplicate records if needed
     unique_records = {}
     for rec in attendance_records:
-        key = (rec["registration_number"], rec["course_code"])
-        unique_records[key] = rec
+        key = (registration_number, rec["course_code"], rec["category"])
+        if key not in unique_records:
+            unique_records[key] = rec
     attendance_records = list(unique_records.values())
     print(f"✅ Parsed {len(attendance_records)} unique attendance records.")
 
-    # For each record, update if it exists, else insert
-    for rec in attendance_records:
-        sel_resp = supabase.table("attendance").select("id") \
-            .eq("user_id", rec["user_id"]) \
-            .eq("course_code", rec["course_code"]) \
-            .execute()
-        if sel_resp.data and len(sel_resp.data) > 0:
-            update_data = {
-                "registration_number": rec["registration_number"],
-                "course_title": rec["course_title"],
-                "category": rec["category"],
-                "faculty": rec["faculty"],
-                "slot": rec["slot"],
-                "hours_conducted": rec["hours_conducted"],
-                "hours_absent": rec["hours_absent"],
-                "attendance_percentage": rec["attendance_percentage"]
-            }
-            up_resp = supabase.table("attendance").update(update_data) \
-                .eq("user_id", rec["user_id"]) \
-                .eq("course_code", rec["course_code"]) \
-                .execute()
-            if up_resp.data:
-                print(f"✅ Updated: {rec}")
-            else:
-                print(f"❌ Failed to update: {rec}")
+    # Build the JSON object for all attendance data
+    attendance_json = {
+        "registration_number": registration_number,
+        "last_updated": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        "records": attendance_records
+    }
+
+    # Upsert the JSON object in Supabase
+    sel_resp = supabase.table("attendance").select("id").eq("user_id", user_id).execute()
+    if sel_resp.data and len(sel_resp.data) > 0:
+        up_resp = supabase.table("attendance").update({
+            "attendance_data": attendance_json,
+            "updated_at": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        }).eq("user_id", user_id).execute()
+        if up_resp.data:
+            print("✅ Attendance JSON updated successfully.")
         else:
-            in_resp = supabase.table("attendance").insert(rec).execute()
-            if in_resp.data:
-                print(f"✅ Inserted: {rec}")
-            else:
-                print(f"❌ Failed to insert: {rec}")
-                
-    # Delete any attendance records for this user not in the current scrape
-    present_courses = [r["course_code"] for r in attendance_records]
-    present_courses_str = "(" + ",".join([f"\"{c}\"" for c in present_courses]) + ")"
-    del_resp = supabase.table("attendance").delete() \
-        .eq("user_id", user_id) \
-        .filter("course_code", "not.in", present_courses_str) \
-        .execute()
-    if del_resp.data:
-        print(f"✅ Deleted old records not in current scrape: {del_resp.data}")
+            print("❌ Failed to update attendance JSON.")
     else:
-        print("✅ No old records to delete.")
+        in_resp = supabase.table("attendance").insert({
+            "user_id": user_id,
+            "attendance_data": attendance_json
+        }).execute()
+        if in_resp.data:
+            print("✅ Attendance JSON inserted successfully.")
+        else:
+            print("❌ Failed to insert attendance JSON.")
 
     return True
+
+def get_course_title(course_code, attendance_records):
+    """
+    Matches course codes to course titles using the attendance records of the logged-in user.
+    Ignores case and the "Regular" suffix.
+    Returns the course title if found; otherwise, falls back to the original course code.
+    """
+    if not attendance_records:
+        print("⚠️ No attendance records found, using fallback course code.")
+        return course_code
+    
+    for record in attendance_records:
+        stored_code = record.get("course_code", "").strip()
+        # Check for an exact match (ignoring case)
+        if stored_code.lower() == course_code.lower():
+            return record.get("course_title", course_code)
+        # Check match when "Regular" is removed
+        if stored_code.replace("Regular", "").strip().lower() == course_code.replace("Regular", "").strip().lower():
+            return record.get("course_title", course_code)
+    
+    print(f"⚠️ No match found for {course_code}, using fallback course code.")
+    return course_code
+
+def parse_and_save_marks(html, driver):
+    """
+    Scrapes the marks details from the page and upserts the data into the Supabase 'marks' table.
+    This function handles any number of courses dynamically and includes multiple defense mechanisms.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    
+    # Extract registration number
+    registration_number = extract_registration_number(soup)
+    if not registration_number:
+        print("❌ Could not find Registration Number for marks!")
+        return False
+    print(f"📌 Extracted Registration Number (marks): {registration_number}")
+    
+    # Get or create the user in Supabase
+    user_id = get_user_id(registration_number, username)
+    if not user_id:
+        print("❌ Could not retrieve or create user in Supabase for marks.")
+        return False
+
+    # Fetch attendance records for the CURRENT user only
+    try:
+        attendance_resp = supabase.table("attendance").select("attendance_data").eq("user_id", user_id).execute()
+    except Exception as e:
+        print(f"❌ Error fetching attendance records: {e}")
+        attendance_resp = None
+    attendance_records = []
+    if attendance_resp and attendance_resp.data and len(attendance_resp.data) > 0:
+        attendance_data = attendance_resp.data[0].get("attendance_data", {})
+        attendance_records = attendance_data.get("records", [])
+    print(f"📌 Loaded {len(attendance_records)} attendance records for user {user_id}")
+    
+    # Locate the marks table by searching for "Test Performance"
+    marks_table = None
+    for table in soup.find_all("table"):
+        header = table.find("tr")
+        if header and "Test Performance" in header.get_text():
+            marks_table = table
+            break
+    if not marks_table:
+        print("❌ No marks table found!")
+        return False
+
+    marks_records = []
+    rows = marks_table.find_all("tr")
+    if rows:
+        for row in rows[1:]:  # Skip header row
+            try:
+                cells = row.find_all("td")
+                if len(cells) < 3:
+                    continue
+
+                course_code = cells[0].get_text(strip=True)
+                fallback_title = cells[1].get_text(strip=True)
+
+                # Try to map course title using attendance records
+                if attendance_records:
+                    try:
+                        course_title = get_course_title(course_code, attendance_records)
+                    except Exception as e:
+                        print(f"❌ Error mapping course code {course_code}: {e}")
+                        course_title = fallback_title
+                else:
+                    course_title = fallback_title
+
+                # The third cell contains a nested table with test details
+                nested_table = cells[2].find("table")
+                tests = []
+                if nested_table:
+                    test_cells = nested_table.find_all("td")
+                    for tc in test_cells:
+                        strong_elem = tc.find("strong")
+                        if not strong_elem:
+                            continue
+                        test_info = strong_elem.get_text(strip=True)
+                        parts = test_info.split("/")
+                        test_code = parts[0].strip()
+                        try:
+                            max_marks = float(parts[1].strip()) if len(parts) == 2 else 0.0
+                        except:
+                            max_marks = 0.0
+                        br = tc.find("br")
+                        obtained_text = br.next_sibling.strip() if br and br.next_sibling else "0"
+                        try:
+                            obtained_marks = float(obtained_text) if obtained_text.replace(".", "").isdigit() else obtained_text
+                        except:
+                            obtained_marks = obtained_text
+                        tests.append({
+                            "test_code": test_code,
+                            "max_marks": max_marks,
+                            "obtained_marks": obtained_marks
+                        })
+                
+                marks_records.append({
+                    "course_name": course_title,
+                    "tests": tests
+                })
+                print(f"🔍 Mapping: {course_code} → {course_title}")
+            except Exception as row_err:
+                print(f"⚠️ Error processing a row: {row_err}")
+                continue
+
+    print(f"✅ Parsed {len(marks_records)} unique marks records.")
+
+    # Build JSON object for marks data
+    marks_json = {
+        "registration_number": registration_number,
+        "last_updated": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        "records": marks_records
+    }
+
+    # Save data in Supabase using update/insert pattern with defense mechanisms
+    try:
+        sel_resp = supabase.table("marks").select("id").eq("user_id", user_id).execute()
+    except Exception as e:
+        print(f"❌ Error selecting marks record: {e}")
+        sel_resp = None
+
+    if sel_resp and sel_resp.data and len(sel_resp.data) > 0:
+        try:
+            up_resp = supabase.table("marks").update({
+                "marks_data": marks_json,
+                "updated_at": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+            }).eq("user_id", user_id).execute()
+            if up_resp.data and len(up_resp.data) > 0:
+                print("✅ Marks JSON updated successfully.")
+            else:
+                raise Exception("Update returned no data")
+        except Exception as update_err:
+            print("❌ Update failed; trying insert as fallback:", update_err)
+            try:
+                in_resp = supabase.table("marks").insert({
+                    "user_id": user_id,
+                    "marks_data": marks_json
+                }).execute()
+                if in_resp.data and len(in_resp.data) > 0:
+                    print("✅ Marks JSON inserted successfully as fallback.")
+                else:
+                    raise Exception("Fallback insert failed")
+            except Exception as insert_err:
+                print("❌ Final failure in saving marks JSON:", insert_err)
+                return False
+    else:
+        try:
+            in_resp = supabase.table("marks").insert({
+                "user_id": user_id,
+                "marks_data": marks_json
+            }).execute()
+            if in_resp.data and len(in_resp.data) > 0:
+                print("✅ Marks JSON inserted successfully.")
+            else:
+                raise Exception("Insert returned no data")
+        except Exception as insert_err:
+            print("❌ Initial insert failed:", insert_err)
+            return False
+
+    return True
+
+
 
 
 def run_scraper(email, pwd):
@@ -247,8 +421,9 @@ def run_scraper(email, pwd):
         if not login(local_driver):
             return False
         html = get_attendance_page(local_driver)
-        success = parse_and_save_attendance(html, local_driver)
-        return success
+        attendance_success = parse_and_save_attendance(html, local_driver)
+        marks_success = parse_and_save_marks(html, local_driver)  # New marks scraping call
+        return attendance_success and marks_success
     except Exception as e:
         print(f"Scraper exception: {e}")
         return False
@@ -256,16 +431,10 @@ def run_scraper(email, pwd):
         local_driver.quit()
         print("🛑 Local ChromeDriver instance closed.")
 
+
+
 if __name__ == "__main__":
-    email_input = input("Enter your email: ")
-    pwd_input = input("Enter your password: ")
+    email_input = 'lb2523@srmist.edu.in'
+    pwd_input = '@Madhav13'
     outcome = run_scraper(email_input, pwd_input)
     print(f"Scraper outcome: {outcome}")
-
-
-
-
-
-
-
-

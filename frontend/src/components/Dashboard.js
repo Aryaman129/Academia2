@@ -3,8 +3,8 @@ import React, { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import LoadingIndicator from "./LoadingIndicator"
+import './Dashboard.css';
 
-// IMPORTANT: Define the API URL
 const API_URL = "http://localhost:5050"
 
 const Dashboard = () => {
@@ -14,31 +14,27 @@ const Dashboard = () => {
   const [timetableData, setTimetableData] = useState({})
   const [batch, setBatch] = useState("")
   const [personalDetails, setPersonalDetails] = useState({})
+  // Marks state (new)
+  const [marksData, setMarksData] = useState({})
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userEmail, setUserEmail] = useState("")
   const navigate = useNavigate()
+
   const parseTimeSlot = (timeSlot) => {
-    // Assumes timeSlot is in "HH:MM-HH:MM" format
     let [start] = timeSlot.split("-");
     let [hour, minute] = start.trim().split(":").map(Number);
-    // If the hour is less than 8, assume it's in the PM (e.g., 1:25 should be 13:25)
-    if (hour < 8) {
-      hour += 12;
-    }
+    if (hour < 8) { hour += 12; }
     return hour * 60 + minute;
   };
-  
   
   // Fetch attendance data
   const fetchAttendance = useCallback(async () => {
     try {
       const token = localStorage.getItem("token")
       const email = localStorage.getItem("userEmail")
-      if (!token) {
-        throw new Error("Authentication required. Please login again.")
-      }
+      if (!token) throw new Error("Authentication required. Please login again.")
       setUserEmail(email || "User")
       console.log("Fetching attendance data...")
       const response = await axios.get(`${API_URL}/api/attendance`, {
@@ -46,7 +42,8 @@ const Dashboard = () => {
       })
       console.log("📌 Attendance API Response:", response.data)
       if (response.data.success) {
-        setAttendanceData(response.data.attendance || [])
+        const records = response.data.attendance.records || [];
+        setAttendanceData(records);
       } else {
         throw new Error(response.data.error || "No attendance records found.")
       }
@@ -66,12 +63,9 @@ const Dashboard = () => {
   const fetchTimetable = useCallback(async () => {
     try {
       const token = localStorage.getItem("token")
-      // Assuming you stored the password during login, else adjust accordingly.
       const password = localStorage.getItem("userPassword") || ""
       if (!token) throw new Error("Authentication required. Please login again.")
       console.log("Fetching timetable data...")
-      // Note: We are using axios.get with a 'data' property.
-      // If your backend requires POST for this endpoint, change to axios.post.
       const response = await axios.get(`${API_URL}/api/timetable`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { password: password }
@@ -90,16 +84,36 @@ const Dashboard = () => {
     }
   }, [])
 
-  // Fetch both timetable and attendance data on mount
+  // Fetch marks data (new)
+  const fetchMarks = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) throw new Error("Authentication required. Please login again.")
+      console.log("Fetching marks data...")
+      const response = await axios.get(`${API_URL}/api/marks`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      console.log("📌 Marks API Response:", response.data)
+      if (response.data.success) {
+        setMarksData(response.data.marks || {})
+      } else {
+        throw new Error(response.data.error || "No marks records found.")
+      }
+    } catch (err) {
+      console.error("Marks fetch error:", err)
+      setError(err.message || "An error occurred while fetching marks data.")
+    }
+  }, [])
+
+  // Fetch all data on mount
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (!token) {
       navigate("/")
       return
     }
-    // Fetch timetable and attendance concurrently
-    Promise.all([fetchTimetable(), fetchAttendance()]).then(() => setLoading(false))
-  }, [fetchAttendance, fetchTimetable, navigate])
+    Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]).then(() => setLoading(false))
+  }, [fetchAttendance, fetchTimetable, fetchMarks, navigate])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -110,7 +124,7 @@ const Dashboard = () => {
 
   const handleRefresh = () => {
     setLoading(true)
-    Promise.all([fetchTimetable(), fetchAttendance()]).then(() => setLoading(false))
+    Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]).then(() => setLoading(false))
   }
 
   if (loading) return <LoadingIndicator message="Fetching your data..." />
@@ -144,7 +158,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-
       {/* Timetable Section */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Timetable</h2>
@@ -160,24 +173,23 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                {Object.entries(slots)
-                 .sort((a, b) => parseTimeSlot(a[0]) - parseTimeSlot(b[0]))
-                 .map(([timeSlot, slotInfo]) => (
-                   <tr key={timeSlot}>
-                     <td className="px-4 py-2">{timeSlot}</td>
-                     <td className="px-4 py-2">
-                       {slotInfo.courses && slotInfo.courses.length > 0
-                         ? slotInfo.courses.map((course, idx) => (
-                             <span key={idx}>
-                               {course.title}
-                               {idx < slotInfo.courses.length - 1 && ", "}
-                             </span>
-                           ))
-                         : slotInfo.original_slot || "Empty"}
-                     </td>
-                   </tr>
-                 ))}
-
+                  {Object.entries(slots)
+                    .sort((a, b) => parseTimeSlot(a[0]) - parseTimeSlot(b[0]))
+                    .map(([timeSlot, slotInfo]) => (
+                      <tr key={timeSlot}>
+                        <td className="px-4 py-2">{timeSlot}</td>
+                        <td className="px-4 py-2">
+                          {slotInfo.courses && slotInfo.courses.length > 0
+                            ? slotInfo.courses.map((course, idx) => (
+                                <span key={idx}>
+                                  {course.title}
+                                  {idx < slotInfo.courses.length - 1 && ", "}
+                                </span>
+                              ))
+                            : slotInfo.original_slot || "Empty"}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -188,7 +200,7 @@ const Dashboard = () => {
       </div>
 
       {/* Attendance Section */}
-      <div>
+      <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Attendance</h2>
         {attendanceData.length > 0 ? (
           <div className="bg-white shadow-md rounded-lg overflow-hidden">
@@ -224,11 +236,7 @@ const Dashboard = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">{record.faculty}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_conducted}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">{record.hours_absent}</td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
-                          record.attendance_percentage < 75 ? "text-red-600" : "text-green-600"
-                        }`}
-                      >
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${record.attendance_percentage < 75 ? "text-red-600" : "text-green-600"}`}>
                         {record.attendance_percentage}%
                       </td>
                     </tr>
@@ -254,9 +262,96 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-    </div>
-  )
-}
 
-export default Dashboard
+      {/* Marks Section */}
+           {/* Marks Section */}
+     <div className="mb-6">
+       <h2 className="text-2xl font-bold mb-2">Marks</h2>
+       {marksData && marksData.records && marksData.records.length > 0 ? (
+         (() => {
+           // Filter out header rows and rows without test details
+           const validMarksRecords = marksData.records.filter(record => {
+             const name = record.course_name.trim().toLowerCase();
+             if (name === "" || name === "semester:" || name === "course title") {
+               return false;
+             }
+             if (!record.tests || record.tests.length === 0) {
+               return false;
+             }
+             return true;
+           });
+     
+           return validMarksRecords.length > 0 ? (
+             <div className="bg-white shadow-md rounded-lg overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="min-w-full divide-y divide-gray-200">
+                   <thead className="bg-gray-50">
+                     <tr>
+                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                         Course Name
+                       </th>
+                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                         Test Details
+                       </th>
+                     </tr>
+                   </thead>
+                   <tbody className="bg-white divide-y divide-gray-200">
+                     {validMarksRecords.map((record, idx) => (
+                       <tr key={idx}>
+                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                           {record.course_name}
+                         </td>
+                         <td className="px-6 py-4 whitespace-nowrap text-sm">
+                           {record.tests.map((test, tIdx) => (
+                             <div key={tIdx}>
+                               {test.test_code}: {test.obtained_marks} / {test.max_marks}
+                             </div>
+                           ))}
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+           ) : (
+             <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+               <p className="font-medium">No valid marks records found.</p>
+               <p className="text-sm mt-1">This could be because:</p>
+               <ul className="list-disc list-inside text-sm mt-1">
+                 <li>Your data is still being fetched from the system</li>
+                 <li>You haven't been registered for any courses yet</li>
+                 <li>There was an issue with the data scraping process</li>
+               </ul>
+               <div className="mt-4">
+                 <button onClick={handleRefresh} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
+                   Try Again
+                 </button>
+               </div>
+             </div>
+           );
+         })()
+       ) : (
+         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+           <p className="font-medium">No marks records found.</p>
+           <p className="text-sm mt-1">This could be because:</p>
+           <ul className="list-disc list-inside text-sm mt-1">
+             <li>Your data is still being fetched from the system</li>
+             <li>You haven't been registered for any courses yet</li>
+             <li>There was an issue with the data scraping process</li>
+           </ul>
+           <div className="mt-4">
+             <button onClick={handleRefresh} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
+               Try Again
+             </button>
+           </div>
+         </div>
+       )}
+     </div>
+
+    </div>
+  );
+};
+
+export default Dashboard;
 
