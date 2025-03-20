@@ -73,8 +73,6 @@ const Dashboard = () => {
       console.log("📌 Timetable API Response:", response.data)
       if (response.data.success) {
         setTimetableData(response.data.timetable || {})
-        setBatch(response.data.batch || "")
-        setPersonalDetails(response.data.personal_details || {})
       } else {
         throw new Error(response.data.error || "No timetable records found.")
       }
