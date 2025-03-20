@@ -21,7 +21,11 @@ app.config['TIMEOUT'] = 30
 
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000"],
+        "origins": [
+            "http://localhost:3000",
+            "https://frontend-neon-mu-83.vercel.app",  # Add your Vercel domain
+            # If you're using a custom domain
+        ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "expose_headers": ["Content-Type", "Authorization"],
