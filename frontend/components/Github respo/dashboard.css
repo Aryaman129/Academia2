@@ -1,0 +1,64 @@
+/* Custom styles for the dashboard */
+
+/* Timetable colors */
+.timetable-yellow {
+    background-color: #fef3c7;
+  }
+  
+  .dark .timetable-yellow {
+    background-color: #78350f;
+  }
+  
+  .timetable-green {
+    background-color: #d1fae5;
+  }
+  
+  .dark .timetable-green {
+    background-color: #065f46;
+  }
+  
+  /* Attendance card styles */
+  .attendance-card {
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .attendance-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  /* Calendar day styles */
+  .day-order-badge {
+    font-size: 8px;
+    color: var(--muted-foreground);
+    margin-top: -2px;
+  }
+  
+  /* Prediction result animation */
+  @keyframes pulse {
+    0% {
+      opacity: 0.8;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.8;
+    }
+  }
+  
+  .prediction-result {
+    animation: pulse 2s infinite;
+  }
+  
+  /* Mobile optimizations */
+  @media (max-width: 640px) {
+    .dashboard-tabs {
+      padding: 0;
+    }
+  
+    .dashboard-card {
+      margin-bottom: 1rem;
+    }
+  }
+  
+  
