@@ -37,29 +37,6 @@ const Auth = () => {
   const [message, setMessage] = useState("")
   const navigate = useNavigate()
 
-  // Check if server is healthy
-  const checkServerHealth = useCallback(async () => {
-    try {
-      const response = await api.get("/health")
-      return response.data.status === "healthy"
-    } catch (error) {
-      console.error("Health check failed:", error)
-      return false
-    }
-  }, [])
-
-  // Check scraper status
-  const checkScraperStatus = useCallback(async (token) => {
-    try {
-      const response = await api.get("/api/scraper-status", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      return response.data.status
-    } catch (error) {
-      console.error("Failed to check scraper status:", error)
-      return { status: "failed" }
-    }
-  }, [])
 
   // Handle login
   const handleLogin = async (e) => {
