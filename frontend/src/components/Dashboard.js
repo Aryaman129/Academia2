@@ -12,8 +12,8 @@ const Dashboard = () => {
   const [attendanceData, setAttendanceData] = useState([])
   // Timetable state
   const [timetableData, setTimetableData] = useState({})
-  const [batch, setBatch] = useState("")
-  const [personalDetails, setPersonalDetails] = useState({})
+  // const [batch, setBatch] = useState("")
+  // const [personalDetails, setPersonalDetails] = useState({})
   // Marks state (new)
   const [marksData, setMarksData] = useState({})
   
