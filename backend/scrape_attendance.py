@@ -34,12 +34,13 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 BASE_URL = "https://academia.srmist.edu.in"
 LOGIN_URL = BASE_URL
 ATTENDANCE_PAGE_URL = "https://academia.srmist.edu.in/#Page:My_Attendance"
-driver_path = r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe"
+driver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver")  # Use environment variable with fallback
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--disable-gpu")
 chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")  # Added for Linux
 chrome_options.add_argument("--window-size=1920,1080")
 chrome_options.add_argument("--ignore-certificate-errors")
 chrome_options.add_argument("--allow-running-insecure-content")
