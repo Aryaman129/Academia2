@@ -644,7 +644,7 @@ if __name__ == "__main__":
     user_email = 'pc7882@srmist.edu.in'
     user_pass = 'Shupi@170803'
 
-    cd_path = r"C:\Users\Lenovo\Desktop\Academia2\Academia2\chromedriver-win64\chromedriver.exe"  # <-- Update to your actual ChromeDriver path
+    cd_path = r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe"  # <-- Update to your actual ChromeDriver path
     if not os.path.exists(cd_path):
         raise ValueError("Invalid ChromeDriver path.")
 

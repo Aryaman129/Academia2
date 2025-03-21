@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 
 # ------------------------ ADJUST THIS IF NEEDED -----------------------
 TIMETABLE_URL = "https://academia.srmist.edu.in/#Page:My_Time_Table_2023_24"
-CHROMEDRIVER_PATH = r"C:\Users\Lenovo\Desktop\Academia2\Academia2\chromedriver-win64\chromedriver.exe"
+CHROMEDRIVER_PATH = r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe"
 # ----------------------------------------------------------------------
 
 BASE_URL = "https://academia.srmist.edu.in"

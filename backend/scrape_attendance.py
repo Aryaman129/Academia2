@@ -34,7 +34,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 BASE_URL = "https://academia.srmist.edu.in"
 LOGIN_URL = BASE_URL
 ATTENDANCE_PAGE_URL = "https://academia.srmist.edu.in/#Page:My_Attendance"
-driver_path = r"C:\Users\Lenovo\Desktop\Academia2\Academia2\chromedriver-win64\chromedriver.exe"
+driver_path = r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe"
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")

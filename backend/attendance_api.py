@@ -61,7 +61,7 @@ def async_timetable_scraper(email, password):
     from scrape_timetable import main_flow
     try:
         print(f"Starting timetable scraper for {email}")
-        driver_path = os.getenv("CHROMEDRIVER_PATH", r"C:\Users\Lenovo\Desktop\Academia2\Academia2\chromedriver-win64\chromedriver.exe")
+        driver_path = os.getenv("CHROMEDRIVER_PATH", r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe")
         result = main_flow(email, password, driver_path=driver_path)
         success = result["status"] == "success"
         print(f"Timetable scraper finished for {email} with success: {success}")
