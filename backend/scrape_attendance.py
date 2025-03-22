@@ -13,6 +13,7 @@ from supabase import create_client, Client
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 from webdriver_manager.chrome import ChromeDriverManager
+import traceback
 # import tensorflow.lite as tflite
 
 #options = tflite.InterpreterOptions()
@@ -121,34 +122,117 @@ password = ""
 def login(driver):
     driver.get(LOGIN_URL)
     wait = WebDriverWait(driver, 30)
-    wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
-    print("✅ Switched to iframe")
-    email_field = wait.until(EC.presence_of_element_located((By.ID, "login_id")))
-    email_field.send_keys(username)
-    print(f"✅ Entered email: {username}")
-    next_button = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
-    next_button.click()
-    print("✅ Clicked Next")
-    time.sleep(2)
-    password_field = wait.until(EC.element_to_be_clickable((By.ID, "password")))
-    password_field.send_keys(password)
-    print("✅ Entered password")
-    sign_in_button = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
-    sign_in_button.click()
-    print("✅ Clicked Sign In")
-    time.sleep(5)
-    if BASE_URL in driver.current_url:
-        print("✅ Login successful")
-        return True
-    else:
-        print("❌ Login failed, check credentials or CAPTCHA requirements")
+    
+    try:
+        # Switch to iframe with retry
+        for attempt in range(3):
+            try:
+                wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
+                print("✅ Switched to iframe")
+                break
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt+1} to switch to iframe failed: {e}")
+                if attempt == 2:  # Last attempt failed
+                    raise
+                time.sleep(2)
+                
+        # Enter email with retry
+        for attempt in range(3):
+            try:
+                email_field = wait.until(EC.presence_of_element_located((By.ID, "login_id")))
+                email_field.clear()  # Clear first
+                time.sleep(0.5)
+                email_field.send_keys(username)
+                print(f"✅ Entered email: {username}")
+                break
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt+1} to enter email failed: {e}")
+                if attempt == 2:  # Last attempt failed
+                    raise
+                time.sleep(2)
+
+        # Click Next button with retry
+        for attempt in range(3):
+            try:
+                next_button = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
+                driver.execute_script("arguments[0].click();", next_button)  # JavaScript click
+                print("✅ Clicked Next")
+                break
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt+1} to click Next failed: {e}")
+                if attempt == 2:  # Last attempt failed
+                    raise
+                time.sleep(2)
+
+        time.sleep(2)  # Wait for password field to be available
+        
+        # Enter password with retry
+        for attempt in range(3):
+            try:
+                password_field = wait.until(EC.presence_of_element_located((By.ID, "password")))
+                password_field.clear()  # Clear first
+                time.sleep(0.5)
+                password_field.send_keys(password)
+                print("✅ Entered password")
+                break
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt+1} to enter password failed: {e}")
+                if attempt == 2:  # Last attempt failed
+                    raise
+                time.sleep(2)
+
+        # Click Sign In button with retry
+        for attempt in range(3):
+            try:
+                sign_in_button = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
+                driver.execute_script("arguments[0].click();", sign_in_button)  # JavaScript click
+                print("✅ Clicked Sign In")
+                break
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt+1} to click Sign In failed: {e}")
+                if attempt == 2:  # Last attempt failed
+                    raise
+                time.sleep(2)
+
+        time.sleep(5)
+        
+        # Switch back to default content
+        driver.switch_to.default_content()
+        
+        if BASE_URL in driver.current_url:
+            # Check for common dashboard elements
+            try:
+                WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, "//a[contains(@href, 'My_Attendance')]"))
+                )
+                print("✅ Login verified with dashboard elements")
+            except:
+                print("⚠️ Login appears successful but dashboard elements not found")
+            return True
+        else:
+            print("❌ Login failed, check credentials or CAPTCHA requirements")
+            driver.quit()
+            return False
+    except Exception as e:
+        print(f"❌ Login error: {e}")
         driver.quit()
         return False
 
 def get_attendance_page(driver):
     driver.get(ATTENDANCE_PAGE_URL)
     print("⏳ Waiting for attendance page to load...")
-    time.sleep(55)
+    
+    try:
+        # Wait for a specific element that indicates the page has loaded
+        WebDriverWait(driver, 60).until(
+            EC.presence_of_element_located((By.XPATH, "//table[contains(., 'Course Code')]"))
+        )
+        print("✅ Attendance page loaded successfully.")
+    except Exception as e:
+        print(f"⚠️ Timed out waiting for attendance page: {e}")
+        # Fallback to a shorter sleep if the element isn't found
+        time.sleep(20)
+    
     html_source = driver.page_source
     with open("attendance_page.html", "w", encoding="utf-8") as f:
         f.write(html_source)
@@ -268,8 +352,13 @@ def parse_and_save_attendance(html, driver):
     }
 
     # Upsert the JSON object in Supabase
-    sel_resp = supabase.table("attendance").select("id").eq("user_id", user_id).execute()
-    if sel_resp.data and len(sel_resp.data) > 0:
+    try:
+        sel_resp = supabase.table("attendance").select("id").eq("user_id", user_id).execute(timeout=10)
+    except Exception as e:
+        print(f"Database operation timed out or failed: {e}")
+        sel_resp = None
+
+    if sel_resp and sel_resp.data and len(sel_resp.data) > 0:
         up_resp = supabase.table("attendance").update({
             "attendance_data": attendance_json,
             "updated_at": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())

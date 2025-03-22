@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import signal
 
 # Load environment variables
 load_dotenv()
@@ -32,10 +33,31 @@ except Exception as e:
 
 active_scrapers = {}
 
+def timeout_handler(signum, frame):
+    raise TimeoutError("Operation timed out")
+
+# Set a global timeout for any operation
+def with_timeout(seconds, func, *args, **kwargs):
+    # Set the timeout handler
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    
+    try:
+        result = func(*args, **kwargs)
+        signal.alarm(0)  # Disable the alarm
+        return result
+    except TimeoutError as e:
+        print(f"Operation timed out after {seconds} seconds")
+        raise e
+    finally:
+        signal.alarm(0)  # Ensure the alarm is disabled
+
 def async_scraper(email, password):
     """Run scraper in background."""
     from scrape_attendance import run_scraper
     try:
+        # Set status to running first before starting the actual work
+        active_scrapers[email] = {"status": "running"}
         print(f"Starting scraper for {email}")
         success = run_scraper(email, password)
         print(f"Scraper finished for {email} with success: {success}")
@@ -44,11 +66,15 @@ def async_scraper(email, password):
         print(f"Scraper error for {email}: {e}")
         active_scrapers[email] = {"status": "failed", "error": str(e)}
 
-def async_timetable_scraper(email, password):
-    """Run timetable scraper in background."""
-    from scrape_timetable import main_flow
+def delayed_timetable_scraper(email, password, delay_seconds=10):
+    """Run timetable scraper in background with a delay to avoid resource conflicts."""
+    time.sleep(delay_seconds)  # Wait before starting to avoid two Chrome instances at once
+    active_scrapers[f"timetable_{email}"] = {"status": "waiting"}
+    
     try:
-        print(f"Starting timetable scraper for {email}")
+        from scrape_timetable import main_flow
+        print(f"Starting timetable scraper for {email} after {delay_seconds}s delay")
+        active_scrapers[f"timetable_{email}"] = {"status": "running"}
         result = main_flow(email, password)
         success = result["status"] == "success"
         print(f"Timetable scraper finished for {email} with success: {success}")
@@ -129,10 +155,9 @@ def login_route():
             daemon=True
         ).start()
         
-        # 6) Start the timetable scraper in parallel
+        # 6) Start the timetable scraper with a delay
         threading.Thread(
-            target=async_timetable_scraper,
-            args=(email, password),
+            target=lambda: delayed_timetable_scraper(email, password, delay_seconds=10),
             daemon=True
         ).start()
 
@@ -287,7 +312,7 @@ def get_user_timetable():
                 active_scrapers[scraper_key] = {"status": "running"}
                 # Run in a separate thread to avoid blocking
                 threading.Thread(
-                    target=async_timetable_scraper,
+                    target=delayed_timetable_scraper,
                     args=(email, password),
                     daemon=True
                 ).start()
