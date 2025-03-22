@@ -15,9 +15,24 @@ from supabase import create_client, Client
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 from webdriver_manager.chrome import ChromeDriverManager
+import sys
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Environment variable logging for Render debugging
+def log_environment():
+    """Log environment variables to help debug Render deployment"""
+    logger.info("=== Environment Variables ===")
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Current directory: {os.getcwd()}")
+    for key in ["PORT", "PYTHONUNBUFFERED", "PATH", "RENDER", "RENDER_SERVICE_ID"]:
+        if key in os.environ:
+            logger.info(f"{key}: {os.environ[key]}")
+    logger.info("===========================")
+
+# Call environment logging at the beginning of the file
+log_environment()
 
 # ====== Logging Setup ======
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -152,9 +167,9 @@ class SRMScraper:
         try:
             # Try direct approach first
             logger.info("Attempting to initialize Chrome driver directly...")
-            driver = webdriver.Chrome(options=chrome_options)
+            self.driver = webdriver.Chrome(options=chrome_options)
             logger.info("✅ Chrome driver successfully initialized directly")
-            return driver
+            return self.driver
         except Exception as e1:
             logger.warning(f"⚠️ Direct initialization failed: {e1}")
             time.sleep(2)  # Small delay between attempts
@@ -169,18 +184,18 @@ class SRMScraper:
                     # Try getting the path or directly installing
                     chrome_driver_path = ChromeDriverManager().install()
                     service = Service(executable_path=chrome_driver_path)
-                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
                     logger.info("✅ Chrome driver successfully initialized with webdriver-manager")
-                    return driver
+                    return self.driver
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to use install() method: {e}")
                     # Fallback to manual location
                     chrome_driver_path = "/opt/render/.local/share/webdriver/chromedriver"
                     if os.path.exists(chrome_driver_path):
                         service = Service(executable_path=chrome_driver_path)
-                        driver = webdriver.Chrome(service=service, options=chrome_options)
+                        self.driver = webdriver.Chrome(service=service, options=chrome_options)
                         logger.info("✅ Chrome driver successfully initialized with manual path")
-                        return driver
+                        return self.driver
                     else:
                         raise Exception("ChromeDriver not found at expected path")
                 
@@ -199,9 +214,9 @@ class SRMScraper:
                     # Make more resilient
                     for attempt in range(3):
                         try:
-                            driver = uc.Chrome(headless=True, options=chrome_options)
+                            self.driver = uc.Chrome(headless=True, options=chrome_options)
                             logger.info("✅ Chrome driver successfully initialized with undetected_chromedriver")
-                            return driver
+                            return self.driver
                         except Exception as retry_error:
                             logger.warning(f"⚠️ undetected_chromedriver attempt {attempt+1} failed: {retry_error}")
                             time.sleep(2)  # Wait a bit before retrying
@@ -1136,7 +1151,13 @@ class SRMScraper:
         """Public interface to run the attendance scraper"""
         logger.info("Starting attendance scraper")
         try:
-            self.setup_driver()
+            self.driver = self.setup_driver()
+            if self.driver is None:
+                logger.error("Failed to initialize Chrome driver")
+                return {"status": "error", "message": "Failed to initialize Chrome driver"}
+            
+            self.apply_timeouts()
+            
             success = self.ensure_login()
             if not success:
                 logger.error("Failed to log in to Academia. Aborting attendance scraping.")
@@ -1194,6 +1215,14 @@ class SRMScraper:
         except:
             logger.warning("Unable to log memory usage (psutil not available)")
 
+    def apply_timeouts(self):
+        """Apply various timeouts to improve reliability on Render"""
+        if self.driver:
+            self.driver.set_page_load_timeout(120)  # 2 minutes
+            self.driver.set_script_timeout(60)  # 1 minute
+            # Add implicit wait - careful with this as it affects all find_element calls
+            self.driver.implicitly_wait(10)  # 10 seconds
+
     def run_unified_scraper(self):
         """Run both scrapers in a single session"""
         logger.info("Starting unified scraper")
@@ -1207,8 +1236,12 @@ class SRMScraper:
         }
         
         try:
-            # Setup driver
-            self.setup_driver()
+            # Setup driver (this now sets self.driver internally)
+            self.driver = self.setup_driver()
+            if self.driver is None:
+                logger.error("Failed to initialize Chrome driver")
+                result["message"] = "Failed to initialize Chrome driver"
+                return result
             
             # Login (once for both scrapers)
             if not self.ensure_login():
@@ -1233,6 +1266,7 @@ class SRMScraper:
                     logger.error("Failed to get attendance page")
             except Exception as e:
                 logger.error(f"Error during attendance scraping: {str(e)}")
+                traceback.print_exc()
                 # Continue to timetable even if attendance fails
             
             # 2. Then run timetable scraper
