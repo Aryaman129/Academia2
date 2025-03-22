@@ -1,85 +1,96 @@
- export const CALENDAR_DATA = `
-MARCH 2025
-Date | Day | Day Order
-1 | Fri | 3
-2 | Sat | -
-3 | Sun | -
-4 | Mon | 4
-5 | Tue | 5
-6 | Wed | 1
-7 | Thu | 2
-8 | Fri | 3
-9 | Sat | -
-10 | Sun | -
-11 | Mon | 4
-12 | Tue | 5
-13 | Wed | 1
-14 | Thu | 2
-15 | Fri | 3
-16 | Sat | -
-17 | Sun | -
-18 | Mon | 4
-19 | Tue | 5
-20 | Wed | 1
-21 | Thu | 2
-22 | Fri | 3
-23 | Sat | -
-24 | Sun | -
-25 | Mon | 4
-26 | Tue | 5
-27 | Wed | 1
-28 | Thu | 2
-29 | Fri | 3
-30 | Sat | -
-31 | Sun | -
-
-APRIL 2025
-Date | Day | Day Order
-1 | Mon | 4
-2 | Tue | 5
-3 | Wed | 1
-4 | Thu | 2
-5 | Fri | 3
-6 | Sat | -
-7 | Sun | -
-8 | Mon | 4
-9 | Tue | 5
-10 | Wed | 1
-11 | Thu | 2
-12 | Fri | 3
-13 | Sat | -
-14 | Sun | -
-15 | Mon | 4
-16 | Tue | 5
-17 | Wed | 1
-18 | Thu | 2
-19 | Fri | 3
-20 | Sat | -
-21 | Sun | -
-22 | Mon | 4
-23 | Tue | 5
-24 | Wed | 1
-25 | Thu | 2
-26 | Fri | 3
-27 | Sat | -
-28 | Sun | -
-29 | Mon | 4
-30 | Tue | 5
-
-MAY 2025
-Date | Day | Day Order
-1 | Wed | 1
-2 | Thu | 2
-3 | Fri | 3
-4 | Sat | -
-5 | Sun | -
-6 | Mon | 4
-7 | Tue | 5
-8 | Wed | 1
-9 | Thu | 2
-10 | Fri | 3
-11 | Sat | -
-12 | Sun | -
-13 | Mon | 4
-14 | Tue | 5
-15 | Wed | 1`;
+export const CALENDAR_DATA = [
+  {
+    month: "MARCH",
+    year: "2025",
+    days: [
+      { date: 1, day: "Sat", dayOrder: null },
+      { date: 2, day: "Sun", dayOrder: null },
+      { date: 3, day: "Mon", dayOrder: 5 },
+      { date: 4, day: "Tue", dayOrder: 1 },
+      { date: 5, day: "Wed", dayOrder: 2 },
+      { date: 6, day: "Thu", dayOrder: 3 },
+      { date: 7, day: "Fri", dayOrder: 4 },
+      { date: 8, day: "Sat", dayOrder: null },
+      { date: 9, day: "Sun", dayOrder: null },
+      { date: 10, day: "Mon", dayOrder: 5 },
+      { date: 11, day: "Tue", dayOrder: 1 },
+      { date: 12, day: "Wed", dayOrder: 2 },
+      { date: 13, day: "Thu", dayOrder: 3 },
+      { date: 14, day: "Fri", dayOrder: 4 },
+      { date: 15, day: "Sat", dayOrder: null },
+      { date: 16, day: "Sun", dayOrder: null },
+      { date: 17, day: "Mon", dayOrder: 5 },
+      { date: 18, day: "Tue", dayOrder: 1 },
+      { date: 19, day: "Wed", dayOrder: 2 },
+      { date: 20, day: "Thu", dayOrder: 3 },
+      { date: 21, day: "Fri", dayOrder: 4 },
+      { date: 22, day: "Sat", dayOrder: null },
+      { date: 23, day: "Sun", dayOrder: null },
+      { date: 24, day: "Mon", dayOrder: 5 },
+      { date: 25, day: "Tue", dayOrder: 1 },
+      { date: 26, day: "Wed", dayOrder: 2 },
+      { date: 27, day: "Thu", dayOrder: 3 },
+      { date: 28, day: "Fri", dayOrder: 4 },
+      { date: 29, day: "Sat", dayOrder: null },
+      { date: 30, day: "Sun", dayOrder: null, holiday: "Telugu New Year's Day - Holiday" },
+      { date: 31, day: "Mon", dayOrder: null, holiday: "Ramzan - Holiday" }
+    ]
+  },
+  {
+    month: "APRIL",
+    year: "2025",
+    days: [
+      { date: 1, day: "Tue", dayOrder: 4 },
+      { date: 2, day: "Wed", dayOrder: 5 },
+      { date: 3, day: "Thu", dayOrder: 1 },
+      { date: 4, day: "Fri", dayOrder: 2 },
+      { date: 5, day: "Sat", dayOrder: null },
+      { date: 6, day: "Sun", dayOrder: null },
+      { date: 7, day: "Mon", dayOrder: 3 },
+      { date: 8, day: "Tue", dayOrder: 4 },
+      { date: 9, day: "Wed", dayOrder: 5 },
+      { date: 10, day: "Thu", dayOrder: null, holiday: "Mahaveer jayanthi - Holiday" },
+      { date: 11, day: "Fri", dayOrder: 1 },
+      { date: 12, day: "Sat", dayOrder: null },
+      { date: 13, day: "Sun", dayOrder: null },
+      { date: 14, day: "Mon", dayOrder: null, holiday: "Tamil New Year's Day - Holiday" },
+      { date: 15, day: "Tue", dayOrder: 2 },
+      { date: 16, day: "Wed", dayOrder: 3 },
+      { date: 17, day: "Thu", dayOrder: 4 },
+      { date: 18, day: "Fri", dayOrder: null, holiday: "Good Friday - Holiday" },
+      { date: 19, day: "Sat", dayOrder: null },
+      { date: 20, day: "Sun", dayOrder: null },
+      { date: 21, day: "Mon", dayOrder: 5 },
+      { date: 22, day: "Tue", dayOrder: 1 },
+      { date: 23, day: "Wed", dayOrder: 2 },
+      { date: 24, day: "Thu", dayOrder: 3 },
+      { date: 25, day: "Fri", dayOrder: 4 },
+      { date: 26, day: "Sat", dayOrder: null },
+      { date: 27, day: "Sun", dayOrder: null },
+      { date: 28, day: "Mon", dayOrder: 5 },
+      { date: 29, day: "Tue", dayOrder: 1 },
+      { date: 30, day: "Wed", dayOrder: 2 }
+    ]
+  },
+  {
+    month: "MAY",
+    year: "2025",
+    days: [
+      { date: 1, day: "Thu", dayOrder: null, holiday: "May Day - Holiday" },
+      { date: 2, day: "Fri", dayOrder: 3 },
+      { date: 3, day: "Sat", dayOrder: null },
+      { date: 4, day: "Sun", dayOrder: null },
+      { date: 5, day: "Mon", dayOrder: 4 },
+      { date: 6, day: "Tue", dayOrder: 5 },
+      { date: 7, day: "Wed", dayOrder: 1 },
+      { date: 8, day: "Thu", dayOrder: 2 },
+      { date: 9, day: "Fri", dayOrder: 3, note: "Last Working Day - B.Tech - II, IV, VI,VIII, M.Tech - II, IV, M.Tech (Int) - II, IV, VI,VIII" },
+      { date: 10, day: "Sat", dayOrder: null },
+      { date: 11, day: "Sun", dayOrder: null },
+      { date: 12, day: "Mon", dayOrder: null },
+      { date: 13, day: "Tue", dayOrder: null },
+      { date: 14, day: "Wed", dayOrder: null },
+      { date: 15, day: "Thu", dayOrder: null }
+    ]
+  }
+];

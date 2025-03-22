@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash  # Imported for user creation if needed
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 # Load environment variables from .env file
@@ -161,7 +162,7 @@ def scrape_timetable(driver):
     for attempt in range(max_retries):
         logger.info(f"Attempt {attempt+1}: Extracting timetable table...")
         soup = BeautifulSoup(driver.page_source, "html.parser")
-
+        
         # Attempt to find the timetable
         table = soup.find("table", class_="course_tbl")
         if not table:
@@ -200,7 +201,7 @@ def scrape_timetable(driver):
                         course_code = cells[idx_code].get_text(strip=True)
                         course_title = cells[idx_title].get_text(strip=True)
                         slot = cells[idx_slot].get_text(strip=True)
-                        gcr_code = cells[idx_gcr].get_text(strip=True)
+                        gcr_code = cells[idx_gcr].get_text(strip=True) if idx_gcr != -1 else ""
                         faculty_name = cells[idx_faculty].get_text(strip=True) if idx_faculty != -1 else ""
                         course_type = cells[idx_ctype].get_text(strip=True) if idx_ctype != -1 else ""
                         room_no = cells[idx_room].get_text(strip=True) if idx_room != -1 else ""
@@ -210,7 +211,7 @@ def scrape_timetable(driver):
                                 "course_code": course_code,
                                 "course_title": course_title,
                                 "slot": slot,
-                                "gcr_code": gcr_code,
+                                "gcr_code": gcr_code,  # Ensure GCR code is included
                                 "faculty_name": faculty_name,
                                 "course_type": course_type,
                                 "room_no": room_no
@@ -368,7 +369,8 @@ def merge_timetable_with_courses(course_data, batch_input=None, personal_details
             "faculty": course.get("faculty_name", "").strip(),
             "room": course.get("room_no", "").strip(),
             "code": course.get("course_code", "").strip(),
-            "type": course.get("course_type", "").strip()
+            "type": course.get("course_type", "").strip(),
+            "gcr_code": course.get("gcr_code", "").strip()  # Ensure GCR code is included
         }
 
         # Handle regular slots with possible "/X" format
@@ -499,6 +501,11 @@ def store_timetable_in_supabase(email, merged_result):
     personal_details = merged_result.get("personal_details")
     course_data = merged_result.get("course_data")
 
+    # Ensure GCR codes are included in course_data
+    for course in course_data:
+        if "gcr_code" not in course:
+            course["gcr_code"] = ""  # Add empty GCR code if missing
+
     # Retrieve user id by email
     try:
         user_resp = supabase.table("users").select("id").eq("email", email).single().execute()
@@ -553,6 +560,30 @@ def store_timetable_in_supabase(email, merged_result):
         return False
     return True
 
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.add_argument('--disable-infobars')
+    chrome_options.add_argument('--disable-notifications')
+    chrome_options.add_argument('--disable-popup-blocking')
+    chrome_options.add_argument('--start-maximized')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # Use webdriver_manager to handle ChromeDriver installation
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    
+    # Set page load timeout
+    driver.set_page_load_timeout(30)
+    return driver
+
 def main_flow(username, password, driver_path=None):
     """
     Updated main_flow:
@@ -562,22 +593,7 @@ def main_flow(username, password, driver_path=None):
     4. Merge timetable
     5. Store in Supabase
     """
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--ignore-certificate-errors")
-    chrome_options.add_argument("--allow-running-insecure-content")
-
-    if not driver_path or not os.path.exists(driver_path):
-        logger.error(f"ChromeDriver path invalid or not provided: {driver_path}")
-        return {"status": "error", "msg": f"ChromeDriver path not valid: {driver_path}"}
-
-    service = Service(driver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    logger.info(f"Using pre-installed ChromeDriver at: {driver_path}")
+    driver = setup_driver()
 
     try:
         # Step 1: Login
@@ -597,7 +613,7 @@ def main_flow(username, password, driver_path=None):
         logger.info(f"Scraped {len(course_data)} courses from timetable page; detected batch={auto_batch}")
 
         # Step 4: Merge timetable with course data
-        merged_result = merge_timetable_with_courses(course_data, batch_input=auto_batch)
+        merged_result = merge_timetable_with_courses(course_data, auto_batch)
 
         if merged_result["status"] != "success":
             driver.quit()

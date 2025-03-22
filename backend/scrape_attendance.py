@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from supabase import create_client, Client
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
+from webdriver_manager.chrome import ChromeDriverManager
 # import tensorflow.lite as tflite
 
 #options = tflite.InterpreterOptions()
@@ -34,20 +35,30 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 BASE_URL = "https://academia.srmist.edu.in"
 LOGIN_URL = BASE_URL
 ATTENDANCE_PAGE_URL = "https://academia.srmist.edu.in/#Page:My_Attendance"
-driver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver")  # Use environment variable with fallback
 
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")  # Added for Linux
-chrome_options.add_argument("--window-size=1920,1080")
-chrome_options.add_argument("--ignore-certificate-errors")
-chrome_options.add_argument("--allow-running-insecure-content")
-chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-
-print("✅ (scrape_attendance) Module loaded. No global driver created.")
-time.sleep(1)
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.add_argument('--disable-infobars')
+    chrome_options.add_argument('--disable-notifications')
+    chrome_options.add_argument('--disable-popup-blocking')
+    chrome_options.add_argument('--start-maximized')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # Use webdriver_manager to handle ChromeDriver installation
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    
+    # Set page load timeout
+    driver.set_page_load_timeout(30)
+    return driver
 
 # Global variables for credentials (will be overwritten in run_scraper)
 username = ""
@@ -414,8 +425,7 @@ def run_scraper(email, pwd):
     password = pwd
     print(f"run_scraper called with {username} / {password}")
 
-    local_service = Service(driver_path)
-    local_driver = webdriver.Chrome(service=local_service, options=chrome_options)
+    local_driver = setup_driver()
     print("✅ New ChromeDriver instance created for scraper thread.")
 
     try:

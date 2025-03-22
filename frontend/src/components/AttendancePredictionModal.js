@@ -12,74 +12,93 @@ const AttendancePredictionModal = ({
   const [calendarData, setCalendarData] = useState([]);
   const [currentMonth, setCurrentMonth] = useState('');
   const [availableMonths, setAvailableMonths] = useState([]);
+  const [todayInfo, setTodayInfo] = useState(null);
+
+  // Function to get today's day order
+  const getTodayInfo = () => {
+    const today = new Date();
+    const monthName = today.toLocaleString('default', { month: 'long' }).toUpperCase();
+    const year = today.getFullYear().toString();
+    
+    // Find current month in calendar data
+    const monthData = CALENDAR_DATA.find(
+      m => m.month === monthName && m.year === year
+    );
+
+    if (!monthData) return null;
+
+    // Find today's data
+    const dayData = monthData.days.find(day => 
+      day.date === today.getDate()
+    );
+
+    if (!dayData) return null;
+
+    return {
+      date: today,
+      dayOrder: dayData.dayOrder,
+      holiday: dayData.holiday,
+      note: dayData.note
+    };
+  };
 
   useEffect(() => {
     if (isOpen) {
-      const parsedData = parseCalendarData(CALENDAR_DATA);
-      setCalendarData(parsedData);
+      // Initialize calendar data
+      setCalendarData(CALENDAR_DATA);
       
       // Get unique months from the calendar data
-      const months = [...new Set(parsedData.map(day => 
-        day.date.toLocaleString('default', { month: 'long', year: 'numeric' })
-      ))];
+      const months = CALENDAR_DATA.map(month => `${month.month} ${month.year}`);
       setAvailableMonths(months);
       
-      // Set current month to the first available month
-      if (months.length > 0 && !currentMonth) {
+      // Set current month to today's month if available, otherwise first month
+      const today = new Date();
+      const currentMonthStr = `${today.toLocaleString('default', { month: 'long' }).toUpperCase()} ${today.getFullYear()}`;
+      if (months.includes(currentMonthStr)) {
+        setCurrentMonth(currentMonthStr);
+      } else if (months.length > 0) {
         setCurrentMonth(months[0]);
       }
+
+      // Get today's info
+      const todayData = getTodayInfo();
+      setTodayInfo(todayData);
     }
   }, [isOpen]);
 
-  const parseCalendarData = (text) => {
-    const lines = text.split('\n');
-    const data = [];
-    let currentMonth = '';
-    let currentYear = '';
-
-    lines.forEach(line => {
-      if (!line.trim()) return;
-      
-      if (line.match(/^[A-Z]+ \d{4}$/)) {
-        const [month, year] = line.split(' ');
-        currentMonth = month;
-        currentYear = year;
-        return;
-      }
-
-      if (line.includes('Date') || line.includes('Day Order')) return;
-
-      const match = line.match(/(\d{1,2})\s*\|\s*([A-Za-z]+)\s*\|\s*(-|\d+)/);
-      if (match) {
-        const [, day, dayName, dayOrder] = match;
-        const date = new Date(`${currentMonth} ${day}, ${currentYear}`);
-        if (!isNaN(date.getTime())) {
-          data.push({
-            date,
-            dayName,
-            dayOrder: dayOrder === '-' ? null : parseInt(dayOrder)
-          });
-        }
-      }
-    });
-
-    return data;
-  };
-
   const getMonthData = (monthYear) => {
+    if (!monthYear) return [];
     const [targetMonth, targetYear] = monthYear.split(' ');
-    return calendarData.filter(day => {
-      const dayMonth = day.date.toLocaleString('default', { month: 'long' });
-      const dayYear = day.date.getFullYear().toString();
-      return dayMonth === targetMonth && dayYear === targetYear;
-    });
+    
+    // Find the month data
+    const monthData = CALENDAR_DATA.find(
+      m => m.month === targetMonth && m.year === targetYear
+    );
+    
+    if (!monthData) return [];
+
+    // Convert the days data to the format we need
+    return monthData.days.map(day => ({
+      date: new Date(`${monthData.month} ${day.date}, ${monthData.year}`),
+      dayName: day.day,
+      dayOrder: day.dayOrder,
+      holiday: day.holiday,
+      note: day.note
+    }));
   };
 
   const getEmptyCellsCount = (monthYear) => {
     if (!monthYear) return 0;
     const [month, year] = monthYear.split(' ');
-    const firstDay = new Date(`${month} 1, ${year}`).getDay();
-    return firstDay;
+    const firstDay = new Date(`${month} 1, ${year}`);
+    return firstDay.getDay();
+  };
+
+  const getDaysInMonth = (monthYear) => {
+    if (!monthYear) return 0;
+    const [month, year] = monthYear.split(' ');
+    const lastDay = new Date(parseInt(year), new Date(`${month} 1`).getMonth() + 1, 0);
+    return lastDay.getDate();
   };
 
   useEffect(() => {
@@ -88,78 +107,78 @@ const AttendancePredictionModal = ({
       const newPredictions = attendanceData
         .filter(subject => subject.course_title.toLowerCase() !== 'course title')
         .map(subject => {
-        const totalClasses = subject.hours_conducted;
-        const presentClasses = totalClasses - subject.hours_absent;
-        const currentPercentage = (presentClasses / totalClasses) * 100;
+          const totalClasses = subject.hours_conducted;
+          const presentClasses = totalClasses - subject.hours_absent;
+          const currentPercentage = (presentClasses / totalClasses) * 100;
 
-        // Count affected classes for this subject on selected dates
-        const affectedClasses = selectedDates.reduce((count, date) => {
-          const dayData = calendarData.find(d => 
-            d.date.toDateString() === date.toDateString()
-          );
-          
-          if (dayData?.dayOrder) {
-            // Get all slots for this day order
-            const daySlots = timetableData[`Day ${dayData.dayOrder}`] || {};
-            
-            // Count how many times this subject appears in this day's slots
-            const classesOnThisDay = Object.values(daySlots).reduce((slotCount, slot) => {
-              if (!slot.courses) return slotCount;
+          // Count affected classes for this subject on selected dates
+          const affectedClasses = selectedDates.reduce((count, selectedDate) => {
+            // Find the month data for this date
+            const monthData = CALENDAR_DATA.find(month => {
+              const selectedMonth = selectedDate.toLocaleString('default', { month: 'long' }).toUpperCase();
+              const selectedYear = selectedDate.getFullYear().toString();
+              return month.month === selectedMonth && month.year === selectedYear;
+            });
+
+            if (!monthData) return count;
+
+            // Find the day data
+            const dayData = monthData.days.find(day => 
+              day.date === selectedDate.getDate()
+            );
+
+            if (dayData && dayData.dayOrder !== null) {
+              // Get all slots for this day order
+              const daySlots = timetableData[`Day ${dayData.dayOrder}`] || {};
               
-              // Count matching courses in this slot
-              const matchingCourses = slot.courses.filter(course => {
-                const courseTitle = course.title.toLowerCase();
-                const subjectTitle = subject.course_title.toLowerCase();
+              // Count how many times this subject appears in this day's slots
+              const classesOnThisDay = Object.values(daySlots).reduce((slotCount, slot) => {
+                if (!slot.courses) return slotCount;
                 
-                // Check if this is a lab class
-                const isLabClass = 
-                  courseTitle.includes('lab') || 
-                  subjectTitle.includes('lab') ||
-                  courseTitle.includes('laboratory') || 
-                  subjectTitle.includes('laboratory');
+                // Count matching courses in this slot
+                const matchingCourses = slot.courses.filter(course => {
+                  const courseTitle = course.title.toLowerCase();
+                  const subjectTitle = subject.course_title.toLowerCase();
+                  return courseTitle === subjectTitle;
+                });
                 
-                // Match only if both are lab classes or both are theory classes
-                return courseTitle === subjectTitle && 
-                       (courseTitle.includes('lab') === subjectTitle.includes('lab'));
-              });
+                return slotCount + matchingCourses.length;
+              }, 0);
               
-              return slotCount + matchingCourses.length;
-            }, 0);
-            
-            return count + classesOnThisDay;
+              return count + classesOnThisDay;
+            }
+            return count;
+          }, 0);
+
+          // Calculate predicted attendance
+          const newTotal = totalClasses + affectedClasses;
+          const predictedPercentage = ((presentClasses) / newTotal) * 100;
+
+          // Calculate required classes if below 75%
+          let requiredClasses = 0;
+          if (predictedPercentage < 75) {
+            let tempTotal = newTotal;
+            let tempPresent = presentClasses;
+            while ((tempPresent / tempTotal) * 100 < 75) {
+              tempPresent++;
+              tempTotal++;
+              requiredClasses++;
+            }
           }
-          return count;
-        }, 0);
 
-        // Calculate predicted attendance
-        const newTotal = totalClasses + affectedClasses;
-        const predictedPercentage = ((presentClasses) / newTotal) * 100;
-
-        // Calculate required classes if below 75%
-        let requiredClasses = 0;
-        if (predictedPercentage < 75) {
-          let tempTotal = newTotal;
-          let tempPresent = presentClasses;
-          while ((tempPresent / tempTotal) * 100 < 75) {
-            tempPresent++;
-            tempTotal++;
-            requiredClasses++;
-          }
-        }
-
-        return {
-          subject: subject.course_title,
-          currentPercentage,
-          predictedPercentage,
-          affectedClasses,
-          requiredClasses,
-          risk: predictedPercentage < 65 ? 'high' : predictedPercentage < 75 ? 'medium' : 'low'
-        };
-      });
+          return {
+            subject: subject.course_title,
+            currentPercentage,
+            predictedPercentage,
+            affectedClasses,
+            requiredClasses,
+            risk: predictedPercentage < 65 ? 'high' : predictedPercentage < 75 ? 'medium' : 'low'
+          };
+        });
 
       setPredictions(newPredictions);
     }
-  }, [selectedDates, attendanceData, timetableData, calendarData]);
+  }, [selectedDates, attendanceData, timetableData]);
 
   if (!isOpen) return null;
 
@@ -170,7 +189,24 @@ const AttendancePredictionModal = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-[#1A1F26] rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-medium text-white">Attendance Prediction</h2>
+          <div>
+            <h2 className="text-xl font-medium text-white">Attendance Prediction</h2>
+            {todayInfo && (
+              <div className="mt-2 text-sm">
+                <span className="text-gray-400">Today: </span>
+                {todayInfo.holiday ? (
+                  <span className="text-yellow-400">{todayInfo.holiday}</span>
+                ) : todayInfo.dayOrder ? (
+                  <span className="text-green-400">Day {todayInfo.dayOrder}</span>
+                ) : (
+                  <span className="text-gray-400">No Classes</span>
+                )}
+                {todayInfo.note && (
+                  <span className="text-blue-400 ml-2">({todayInfo.note})</span>
+                )}
+              </div>
+            )}
+          </div>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl"
@@ -209,40 +245,50 @@ const AttendancePredictionModal = ({
           </div>
 
           <div className="grid grid-cols-7 gap-1">
-            {/* Add empty cells for days before the first day of the month */}
             {Array(emptyCells).fill(null).map((_, index) => (
-              <button key={`empty-${index}`} className="p-2 invisible">
-                {/* Empty cell */}
-              </button>
+              <div key={`empty-${index}`} className="p-2 invisible">
+                <div className="text-base font-medium">&nbsp;</div>
+              </div>
             ))}
-            
-            {currentMonthData.map((day, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  if (!day || !day.dayOrder) return;
-                  setSelectedDates(prev => 
-                    prev.some(d => d.toDateString() === day.date.toDateString())
-                      ? prev.filter(d => d.toDateString() !== day.date.toDateString())
-                      : [...prev, day.date]
-                  );
-                }}
-                disabled={!day || !day.dayOrder}
-                className={`
-                  p-2 rounded text-sm font-medium
-                  ${!day ? 'invisible' :
-                    !day.dayOrder ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 
-                    selectedDates.some(d => d.toDateString() === day.date.toDateString())
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}
-                `}
-              >
-                {day.date.getDate()}
-                {day.dayOrder && (
-                  <div className="text-[10px] opacity-50">Day {day.dayOrder}</div>
-                )}
-              </button>
-            ))}
+
+            {currentMonthData.map((day, index) => {
+              const isNonClassDay = day.dayOrder === null;
+              const isSelected = selectedDates.some(d => d.toDateString() === day.date.toDateString());
+              
+              return (
+                <button
+                  key={`day-${index}`}
+                  onClick={() => {
+                    if (isNonClassDay) return;
+                    setSelectedDates(prev => 
+                      isSelected
+                        ? prev.filter(d => d.toDateString() !== day.date.toDateString())
+                        : [...prev, day.date]
+                    );
+                  }}
+                  disabled={isNonClassDay}
+                  className={`
+                    relative p-2 rounded text-center flex flex-col items-center justify-center min-h-[3rem]
+                    ${day.holiday 
+                      ? 'bg-yellow-800/30 text-yellow-200/70 cursor-not-allowed' 
+                      : isNonClassDay 
+                        ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed' 
+                        : isSelected
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-700/50 text-gray-200 hover:bg-gray-600'}
+                  `}
+                  title={day.holiday || day.note || ''}
+                >
+                  <div className="text-base font-medium">{day.date.getDate()}</div>
+                  {!isNonClassDay && (
+                    <div className="text-[10px] mt-0.5 opacity-60">Day {day.dayOrder}</div>
+                  )}
+                  {(day.holiday || day.note) && (
+                    <div className="absolute top-0 right-0 w-2 h-2 bg-yellow-400 rounded-full mr-1 mt-1" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 

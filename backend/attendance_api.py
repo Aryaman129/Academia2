@@ -61,8 +61,7 @@ def async_timetable_scraper(email, password):
     from scrape_timetable import main_flow
     try:
         print(f"Starting timetable scraper for {email}")
-        driver_path = os.getenv("CHROMEDRIVER_PATH", r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe")
-        result = main_flow(email, password, driver_path=driver_path)
+        result = main_flow(email, password)
         success = result["status"] == "success"
         print(f"Timetable scraper finished for {email} with success: {success}")
         active_scrapers[f"timetable_{email}"] = {
@@ -103,19 +102,30 @@ def login_route():
             # 2) Create new user with empty registration_number
             new_user = {
                 "email": email,
-                "password_hash": generate_password_hash(password),
+                "password_hash": generate_password_hash(password, method='pbkdf2:sha256'),
                 "registration_number": ""
             }
             insert_resp = supabase.table("users").insert(new_user).execute()
             user = insert_resp.data[0]
         else:
             user = resp.data[0]
-            # 3) If password mismatch, update hash
-            if not check_password_hash(user["password_hash"], password):
-                new_hash = generate_password_hash(password)
-                supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
-                updated_resp = supabase.table("users").select("*").eq("id", user["id"]).execute()
-                user = updated_resp.data[0]
+            try:
+                # Try to verify with existing hash
+                if not check_password_hash(user["password_hash"], password):
+                    # If verification fails, update to new hash
+                    new_hash = generate_password_hash(password, method='pbkdf2:sha256')
+                    supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
+                    updated_resp = supabase.table("users").select("*").eq("id", user["id"]).execute()
+                    user = updated_resp.data[0]
+            except ValueError as e:
+                if "unsupported hash type" in str(e):
+                    # If old hash is incompatible, update to new hash
+                    new_hash = generate_password_hash(password, method='pbkdf2:sha256')
+                    supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
+                    updated_resp = supabase.table("users").select("*").eq("id", user["id"]).execute()
+                    user = updated_resp.data[0]
+                else:
+                    raise
 
         # 4) Generate token with user["id"]
         token = jwt.encode({
@@ -386,7 +396,7 @@ def register():
 
         new_user = {
             "email": email,
-            "password_hash": generate_password_hash(password),
+            "password_hash": generate_password_hash(password, method='pbkdf2:sha256'),
             "registration_number": ""
         }
         insert_resp = supabase.table("users").insert(new_user).execute()
