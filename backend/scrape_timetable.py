@@ -1,4 +1,4 @@
-import time
+''' import time
 import json
 import os
 import re
@@ -843,76 +843,4 @@ if __name__ == "__main__":
                     if slotinfo["original_slot"] and slotinfo["original_slot"] not in ["X", "-"]:
                         print(f"  {time_interval} => {slotinfo['original_slot']}")
                     else:
-                        print(f"  {time_interval} => Empty")
-
-
-
-
-## Step 2: Add the timetable endpoint to attendance_api.py
-
-'''Now, let's add the timetable endpoint to your attendance_api.py file:
-
-```python file="attendance_api.py"
-# Add these imports at the top of your file
-from trial_timetable_merge import main_flow as get_timetable
-
-# Add this new endpoint
-@app.route("/api/timetable", methods=["GET", "OPTIONS"])
-def get_user_timetable():
-    if request.method == "OPTIONS":
-        return jsonify({"success": True}), 200
-    try:
-        # Get token from header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"success": False, "error": "No token provided"}), 401
-
-        token = auth_header.split(" ")[1]
-        try:
-            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
-            user_id = payload["id"]
-            email = payload["email"]
-        except jwt.ExpiredSignatureError:
-            return jsonify({"success": False, "error": "Token expired"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"success": False, "error": "Invalid token"}), 401
-
-        # Get user credentials from database
-        user_resp = supabase.table("users").select("*").eq("id", user_id).execute()
-        if not user_resp.data:
-            return jsonify({"success": False, "error": "User not found"}), 404
-        
-        user = user_resp.data[0]
-        
-        # Check if we have a password (we should, from login)
-        if not user.get("password_hash"):
-            return jsonify({"success": False, "error": "Password not available"}), 400
-            
-        # Get the raw password from the request if available
-        data = request.get_json() or {}
-        password = data.get("password")
-        
-        # If no password in request, return error
-        if not password:
-            return jsonify({"success": False, "error": "Password required for timetable access"}), 400
-        
-        # Get timetable data
-        timetable_result = get_timetable(email, password)
-        
-        if timetable_result["status"] != "success":
-            return jsonify({
-                "success": False, 
-                "error": timetable_result.get("msg", "Failed to fetch timetable")
-            }), 500
-            
-        return jsonify({
-            "success": True,
-            "timetable": timetable_result["merged_timetable"],
-            "batch": timetable_result["batch"],
-            "personal_details": timetable_result["personal_details"]
-        }), 200
-
-    except Exception as e:
-        print(f"Error fetching timetable: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-'''
+                        print(f"  {time_interval} => Empty")'''

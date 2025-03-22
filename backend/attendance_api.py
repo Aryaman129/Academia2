@@ -64,6 +64,39 @@ def delayed_timetable_scraper(email, password, delay_seconds=10):
         print(f"Timetable scraper error for {email}: {e}")
         active_scrapers[f"timetable_{email}"] = {"status": "failed", "error": str(e)}
 
+def unified_async_scraper(email, password):
+    """Run unified scraper in background to handle both attendance and timetable."""
+    from srm_scrapper import run_scraper
+    
+    try:
+        print(f"Starting unified scraper for {email}")
+        # Initialize both statuses
+        active_scrapers[email] = {"status": "running"}
+        active_scrapers[f"timetable_{email}"] = {"status": "running"}
+        
+        # Run the unified scraper
+        result = run_scraper(email, password, scraper_type="unified")
+        
+        # Update attendance status
+        active_scrapers[email] = {
+            "status": "completed" if result.get("attendance_success", False) else "failed"
+        }
+        
+        # Update timetable status
+        if result.get("timetable_success", False):
+            active_scrapers[f"timetable_{email}"] = {
+                "status": "completed",
+                "result": result.get("timetable_data", {})
+            }
+        else:
+            active_scrapers[f"timetable_{email}"] = {"status": "failed"}
+            
+        print(f"Unified scraper completed for {email}")
+    except Exception as e:
+        print(f"Unified scraper error: {e}")
+        active_scrapers[email] = {"status": "failed", "error": str(e)}
+        active_scrapers[f"timetable_{email}"] = {"status": "failed", "error": str(e)}
+
 @app.route("/health", methods=["GET"])
 def health_check():
     print("Health check endpoint hit")
@@ -126,16 +159,10 @@ def login_route():
             "exp": datetime.utcnow() + timedelta(hours=24)
         }, os.getenv("JWT_SECRET", "default-secret-key"))
 
-        # 5) Start the attendance scraper
+        # 5) Start the unified scraper
         threading.Thread(
-            target=async_scraper,
+            target=unified_async_scraper,
             args=(email, password),
-            daemon=True
-        ).start()
-        
-        # 6) Start the timetable scraper with a delay
-        threading.Thread(
-            target=lambda: delayed_timetable_scraper(email, password, delay_seconds=10),
             daemon=True
         ).start()
 

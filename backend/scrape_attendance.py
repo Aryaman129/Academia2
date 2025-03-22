@@ -1,4 +1,4 @@
-import time
+'''import time          
 import json
 import os
 import traceback
@@ -34,7 +34,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ====== Selenium Setup ======
 BASE_URL = "https://academia.srmist.edu.in"
-LOGIN_URL = BASE_URL
+LOGIN_URL = BASE_URL        
 ATTENDANCE_PAGE_URL = "https://academia.srmist.edu.in/#Page:My_Attendance"
 
 def setup_driver():
@@ -617,4 +617,4 @@ if __name__ == "__main__":
     email_input = 'lb2523@srmist.edu.in'
     pwd_input = '@Madhav13'
     outcome = run_scraper(email_input, pwd_input)
-    print(f"Scraper outcome: {outcome}")
+    print(f"Scraper outcome: {outcome}")'''
