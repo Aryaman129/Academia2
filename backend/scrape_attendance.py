@@ -57,6 +57,7 @@ def setup_driver():
         return driver
     except Exception as e1:
         print(f"⚠️ Direct initialization failed: {e1}")
+        time.sleep(3)  # Add small delay between attempts
         
         try:
             # Try with webdriver-manager
@@ -64,25 +65,50 @@ def setup_driver():
             from selenium.webdriver.chrome.service import Service
             from webdriver_manager.chrome import ChromeDriverManager
             
-            # Instead of using install(), which is causing the tuple error
-            chrome_driver_path = ChromeDriverManager().driver_path
-            if not chrome_driver_path:
+            try:
+                # Try getting the path or directly installing
                 chrome_driver_path = ChromeDriverManager().install()
+                service = Service(executable_path=chrome_driver_path)
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ Chrome driver successfully initialized with webdriver-manager")
+                return driver
+            except Exception as e:
+                print(f"⚠️ Failed to use install() method: {e}")
+                # Fallback to manual location
+                chrome_driver_path = "/opt/render/.local/share/webdriver/chromedriver"
+                if os.path.exists(chrome_driver_path):
+                    service = Service(executable_path=chrome_driver_path)
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    print("✅ Chrome driver successfully initialized with manual path")
+                    return driver
+                else:
+                    raise Exception("ChromeDriver not found at expected path")
                 
-            service = Service(executable_path=chrome_driver_path)
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            print("✅ Chrome driver successfully initialized with webdriver-manager")
-            return driver
         except Exception as e2:
             print(f"⚠️ Webdriver-manager initialization failed: {e2}")
+            time.sleep(1)  # Add small delay between attempts
             
             try:
                 # Final attempt with undetected_chromedriver
                 print("Attempting to initialize with undetected_chromedriver...")
                 import undetected_chromedriver as uc
-                driver = uc.Chrome(headless=True, options=chrome_options)
-                print("✅ Chrome driver successfully initialized with undetected_chromedriver")
-                return driver
+                
+                # Set environment variables to debug undetected_chromedriver
+                os.environ['UC_LOG_LEVEL'] = 'DEBUG'
+                
+                # Make more resilient
+                for attempt in range(3):
+                    try:
+                        driver = uc.Chrome(headless=True, options=chrome_options)
+                        print("✅ Chrome driver successfully initialized with undetected_chromedriver")
+                        return driver
+                    except Exception as retry_error:
+                        print(f"⚠️ undetected_chromedriver attempt {attempt+1} failed: {retry_error}")
+                        time.sleep(2)  # Wait a bit before retrying
+                        
+                # If we're here, all retry attempts failed
+                raise Exception("All undetected_chromedriver attempts failed")
+                
             except Exception as e3:
                 print(f"❌ All initialization methods failed: {e3}")
                 print("Please make sure Chrome is installed on this system.")
