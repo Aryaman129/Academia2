@@ -4,6 +4,7 @@ import os
 import re
 import logging
 import traceback
+import sys
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -15,10 +16,14 @@ from supabase import create_client, Client
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 from webdriver_manager.chrome import ChromeDriverManager
-import sys
 
 # Load environment variables from .env file
 load_dotenv()
+
+# ====== Logging Setup ======
+# Set up logging BEFORE calling any functions that use it
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Environment variable logging for Render debugging
 def log_environment():
@@ -31,12 +36,8 @@ def log_environment():
             logger.info(f"{key}: {os.environ[key]}")
     logger.info("===========================")
 
-# Call environment logging at the beginning of the file
+# Call environment logging AFTER logger is defined
 log_environment()
-
-# ====== Logging Setup ======
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 # ====== Supabase Configuration ======
 SUPABASE_URL = os.getenv("SUPABASE_URL")

@@ -66,13 +66,14 @@ def delayed_timetable_scraper(email, password, delay_seconds=10):
 
 def unified_async_scraper(email, password):
     """Run unified scraper in background to handle both attendance and timetable."""
-    from srm_scrapper import run_scraper
-    
     try:
         print(f"Starting unified scraper for {email}")
         # Initialize both statuses
         active_scrapers[email] = {"status": "running"}
         active_scrapers[f"timetable_{email}"] = {"status": "running"}
+        
+        # Import here to avoid circular imports
+        from srm_scrapper import run_scraper
         
         # Run the unified scraper
         result = run_scraper(email, password, scraper_type="unified")
@@ -94,6 +95,8 @@ def unified_async_scraper(email, password):
         print(f"Unified scraper completed for {email}")
     except Exception as e:
         print(f"Unified scraper error: {e}")
+        import traceback
+        traceback.print_exc()  # Print full traceback for debugging
         active_scrapers[email] = {"status": "failed", "error": str(e)}
         active_scrapers[f"timetable_{email}"] = {"status": "failed", "error": str(e)}
 
