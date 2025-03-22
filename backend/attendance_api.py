@@ -19,20 +19,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = Flask(__name__)
 app.config['TIMEOUT'] = 30
 
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "http://localhost:3000",
-            "https://frontend-neon-mu-83.vercel.app",  # Add your Vercel domain
-            # If you're using a custom domain
-        ],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True,
-        "max_age": 3600
-    }
-})
+# Enable CORS for your frontend domain
+CORS(app, origins=["https://academia-khaki.vercel.app", "http://localhost:3000"])
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -420,9 +408,9 @@ def register():
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5050))
+    port = int(os.environ.get("PORT", 10000))
     print(f"Starting server on port {port}...")
-    app.run(host="0.0.0.0", port=port, debug=True, threaded=True)
+    app.run(host="0.0.0.0", port=port)
 
 
 

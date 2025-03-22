@@ -7,7 +7,7 @@ import LoadingIndicator from "./LoadingIndicator"
 
 // Create axios instance with proper config
 const api = axios.create({
-  baseURL: "http://localhost:5050",
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5050",
   timeout: 60000,
   headers: {
     "Content-Type": "application/json",
