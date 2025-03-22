@@ -164,12 +164,28 @@ def login(driver):
                     raise
                 time.sleep(2)
 
-        time.sleep(2)  # Wait for password field to be available
+        # ===== Critical Fix: Wait longer and switch iframe context if needed =====
+        # Wait longer for the page transition to complete
+        time.sleep(5)  # Increase from 2s to 5s
         
-        # Enter password with retry
+        # Check if we need to switch to iframe again
+        try:
+            # First check if we're already in the correct context
+            password_field = driver.find_element(By.ID, "password")
+        except:
+            # If not, try to switch back to default and then to iframe again
+            print("Switching iframe context for password field")
+            driver.switch_to.default_content()
+            wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
+        
+        # Enter password with retry - now with better iframe handling
         for attempt in range(3):
             try:
-                password_field = wait.until(EC.presence_of_element_located((By.ID, "password")))
+                # Wait explicitly for password field to be visible and interactable
+                password_field = wait.until(
+                    EC.element_to_be_clickable((By.ID, "password"))
+                )
+                time.sleep(1)  # Small delay for stability
                 password_field.clear()  # Clear first
                 time.sleep(0.5)
                 password_field.send_keys(password)
@@ -178,8 +194,18 @@ def login(driver):
             except Exception as e:
                 print(f"⚠️ Attempt {attempt+1} to enter password failed: {e}")
                 if attempt == 2:  # Last attempt failed
-                    raise
-                time.sleep(2)
+                    # Try one more approach - use JavaScript to set the value
+                    try:
+                        print("Trying JavaScript approach to enter password")
+                        driver.execute_script(
+                            'document.getElementById("password").value = arguments[0]', 
+                            password
+                        )
+                        print("Entered password via JavaScript")
+                    except Exception as js_error:
+                        print(f"JavaScript password entry also failed: {js_error}")
+                        raise
+                time.sleep(3)  # Increased wait between attempts
 
         # Click Sign In button with retry
         for attempt in range(3):

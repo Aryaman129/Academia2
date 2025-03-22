@@ -156,12 +156,28 @@ def login_srm(driver, username, password):
                     raise
                 time.sleep(2)
 
-        time.sleep(2)  # Wait for password field to be available
+        # ===== Critical Fix: Wait longer and switch iframe context if needed =====
+        # Wait longer for the page transition to complete
+        time.sleep(5)  # Increase from 2s to 5s
         
-        # Enter password with retry
+        # Check if we need to switch to iframe again
+        try:
+            # First check if we're already in the correct context
+            password_field = driver.find_element(By.ID, "password")
+        except:
+            # If not, try to switch back to default and then to iframe again
+            logger.info("Switching iframe context for password field")
+            driver.switch_to.default_content()
+            wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
+        
+        # Enter password with retry - now with better iframe handling
         for attempt in range(3):
             try:
-                password_field = wait.until(EC.presence_of_element_located((By.ID, "password")))
+                # Wait explicitly for password field to be visible and interactable
+                password_field = wait.until(
+                    EC.element_to_be_clickable((By.ID, "password"))
+                )
+                time.sleep(1)  # Small delay for stability
                 password_field.clear()  # Clear first
                 time.sleep(0.5)
                 password_field.send_keys(password)
@@ -170,8 +186,18 @@ def login_srm(driver, username, password):
             except Exception as e:
                 logger.warning(f"⚠️ Attempt {attempt+1} to enter password failed: {e}")
                 if attempt == 2:  # Last attempt failed
-                    raise
-                time.sleep(2)
+                    # Try one more approach - use JavaScript to set the value
+                    try:
+                        logger.info("Trying JavaScript approach to enter password")
+                        driver.execute_script(
+                            'document.getElementById("password").value = arguments[0]', 
+                            password
+                        )
+                        logger.info("Entered password via JavaScript")
+                    except Exception as js_error:
+                        logger.error(f"JavaScript password entry also failed: {js_error}")
+                        raise
+                time.sleep(3)  # Increased wait between attempts
 
         # Click Sign In button with retry
         for attempt in range(3):
@@ -192,16 +218,8 @@ def login_srm(driver, username, password):
         driver.switch_to.default_content()
         
         if BASE_URL in driver.current_url:
-            # Check for an element that should be present on the dashboard
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "//a[contains(@href, 'My_Time_Table') or contains(@href, 'My_Attendance')]"))
-                )
-                logger.info("Login successful - verified dashboard elements")
-                return True
-            except:
-                logger.warning("Login appears successful but dashboard elements not found")
-                return True  # Still return true since we're on the right domain
+            logger.info("Login successful")
+            return True
         else:
             logger.error("Login failed, check credentials or CAPTCHA")
             return False
@@ -214,86 +232,81 @@ def scrape_timetable(driver):
     Scrapes the timetable table (and optionally the batch info) from the page.
     """
     logger.info(f"Navigating to timetable page: {TIMETABLE_URL}")
-    try:
-        driver.get(TIMETABLE_URL)
-        time.sleep(50)  # Wait for the page to load
+    driver.get(TIMETABLE_URL)
+    time.sleep(50)  # Wait for the page to load
 
-        max_retries = 3
-        extracted_rows = []
-        for attempt in range(max_retries):
-            logger.info(f"Attempt {attempt+1}: Extracting timetable table...")
-            soup = BeautifulSoup(driver.page_source, "html.parser")
-            
-            # Attempt to find the timetable
-            table = soup.find("table", class_="course_tbl")
-            if not table:
-                # Some pages have a different class or structure
-                for t in soup.find_all("table"):
-                    if "Course Code" in t.get_text():
-                        table = t
-                        break
+    max_retries = 3
+    extracted_rows = []
+    for attempt in range(max_retries):
+        logger.info(f"Attempt {attempt+1}: Extracting timetable table...")
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        
+        # Attempt to find the timetable
+        table = soup.find("table", class_="course_tbl")
+        if not table:
+            # Some pages have a different class or structure
+            for t in soup.find_all("table"):
+                if "Course Code" in t.get_text():
+                    table = t
+                    break
 
-            if table:
-                try:
-                    rows = table.find_all("tr")
-                    if len(rows) < 2:
-                        continue
-                    header_cells = rows[0].find_all(["th", "td"])
-                    headers = [cell.get_text(strip=True) for cell in header_cells]
+        if table:
+            try:
+                rows = table.find_all("tr")
+                if len(rows) < 2:
+                    continue
+                header_cells = rows[0].find_all(["th", "td"])
+                headers = [cell.get_text(strip=True) for cell in header_cells]
 
-                    def col_index(name):
-                        for i, h in enumerate(headers):
-                            if name in h:
-                                return i
-                        return -1
+                def col_index(name):
+                    for i, h in enumerate(headers):
+                        if name in h:
+                            return i
+                    return -1
 
-                    idx_code = col_index("Course Code")
-                    idx_title = col_index("Course Title")
-                    idx_slot = col_index("Slot")
-                    idx_gcr = col_index("GCR Code")
-                    idx_faculty = col_index("Faculty")
-                    idx_ctype = col_index("Course Type")
-                    idx_room = col_index("Room")
+                idx_code = col_index("Course Code")
+                idx_title = col_index("Course Title")
+                idx_slot = col_index("Slot")
+                idx_gcr = col_index("GCR Code")
+                idx_faculty = col_index("Faculty")
+                idx_ctype = col_index("Course Type")
+                idx_room = col_index("Room")
 
-                    data_rows = []
-                    for row in rows[1:]:
-                        cells = row.find_all("td")
-                        if len(cells) > max(idx_code, idx_title, idx_slot, idx_faculty, idx_ctype, idx_room):
-                            course_code = cells[idx_code].get_text(strip=True)
-                            course_title = cells[idx_title].get_text(strip=True)
-                            slot = cells[idx_slot].get_text(strip=True)
-                            gcr_code = cells[idx_gcr].get_text(strip=True) if idx_gcr != -1 else ""
-                            faculty_name = cells[idx_faculty].get_text(strip=True) if idx_faculty != -1 else ""
-                            course_type = cells[idx_ctype].get_text(strip=True) if idx_ctype != -1 else ""
-                            room_no = cells[idx_room].get_text(strip=True) if idx_room != -1 else ""
+                data_rows = []
+                for row in rows[1:]:
+                    cells = row.find_all("td")
+                    if len(cells) > max(idx_code, idx_title, idx_slot, idx_faculty, idx_ctype, idx_room):
+                        course_code = cells[idx_code].get_text(strip=True)
+                        course_title = cells[idx_title].get_text(strip=True)
+                        slot = cells[idx_slot].get_text(strip=True)
+                        gcr_code = cells[idx_gcr].get_text(strip=True) if idx_gcr != -1 else ""
+                        faculty_name = cells[idx_faculty].get_text(strip=True) if idx_faculty != -1 else ""
+                        course_type = cells[idx_ctype].get_text(strip=True) if idx_ctype != -1 else ""
+                        room_no = cells[idx_room].get_text(strip=True) if idx_room != -1 else ""
 
-                            if course_code and course_title:
-                                data_rows.append({
-                                    "course_code": course_code,
-                                    "course_title": course_title,
-                                    "slot": slot,
-                                    "gcr_code": gcr_code,  # Ensure GCR code is included
-                                    "faculty_name": faculty_name,
-                                    "course_type": course_type,
-                                    "room_no": room_no
-                                })
+                        if course_code and course_title:
+                            data_rows.append({
+                                "course_code": course_code,
+                                "course_title": course_title,
+                                "slot": slot,
+                                "gcr_code": gcr_code,  # Ensure GCR code is included
+                                "faculty_name": faculty_name,
+                                "course_type": course_type,
+                                "room_no": room_no
+                            })
 
-                    if data_rows:
-                        logger.info(f"Extracted {len(data_rows)} course entries.")
-                        extracted_rows = data_rows
-                        break
-                except Exception as e:
-                    logger.warning(f"Error parsing table on attempt {attempt+1}: {e}")
+                if data_rows:
+                    logger.info(f"Extracted {len(data_rows)} course entries.")
+                    extracted_rows = data_rows
+                    break
+            except Exception as e:
+                logger.warning(f"Error parsing table on attempt {attempt+1}: {e}")
 
-            time.sleep(5)
+        time.sleep(5)
 
-        if not extracted_rows:
-            logger.error("Failed to extract timetable table after retries.")
-        return extracted_rows
-    except Exception as e:
-        error_details = f"Error: {str(e)}\nStack: {traceback.format_exc()}"
-        logger.error(f"Failed to process timetable: {error_details}")
-        return []
+    if not extracted_rows:
+        logger.error("Failed to extract timetable table after retries.")
+    return extracted_rows
 
 
 def dump_page_source(driver, filename="debug_page_source.html", num_chars=1000):
@@ -327,22 +340,61 @@ def debug_print_red_tags(driver):
 
 
 def parse_batch_number_from_page(driver):
-    try:
-        dump_page_source(driver, filename="debug_page_source.html", num_chars=1000)
-        
-        # Avoid timeout errors with reasonable fallback
-        try:
-            WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Batch')]"))
-            )
-        except Exception as e:
-            logger.warning(f"Batch text not found in page: {e}")
-            # Continue execution - we'll try other detection methods
-            
-        # Rest of your implementation...
-    except Exception as e:
-        logger.error(f"Error in batch detection: {e}")
-        return None
+    
+    dump_page_source(driver, filename="debug_page_source.html", num_chars=1000)
+# Wait up to 30 seconds for an element containing "Batch" to be visible.
+    WebDriverWait(driver, 50).until(
+    EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Batch')]"))
+    )
+    """
+    Extract batch number from either timetable or attendance page HTML.
+    Returns the batch number as a string or None if not found.
+    """
+    soup = BeautifulSoup(driver.page_source, "html.parser")
+    
+    # Method 1: Look for a table cell with "Batch:" label
+    batch_label = soup.find("td", string=lambda text: text and "Batch:" in text)
+    if batch_label:
+        next_cell = batch_label.find_next("td")
+        if next_cell:
+            batch_text = next_cell.get_text(strip=True)
+            if batch_text and batch_text.isdigit():
+                return batch_text
+    
+    # Method 2: Look for a table row with batch information
+    batch_td = soup.find("td", string=lambda text: text and "Batch" in text and ":" not in text)
+    if batch_td:
+        # The batch number might be in the next cell
+        next_td = batch_td.find_next("td")
+        if next_td:
+            batch_text = next_td.get_text(strip=True)
+            if batch_text and batch_text.isdigit():
+                return batch_text
+    
+    # Method 3: Look for a specific pattern in the HTML
+    # This pattern matches "Batch:</td><td>2</td>" or similar structures
+    batch_rows = soup.find_all("tr")
+    for row in batch_rows:
+        cells = row.find_all("td")
+        for i, cell in enumerate(cells):
+            if "Batch" in cell.get_text() and i+1 < len(cells):
+                batch_text = cells[i+1].get_text(strip=True)
+                if batch_text and batch_text.isdigit():
+                    return batch_text
+    
+    # Method 4: Use regex to find batch number pattern in the HTML
+    # This is a fallback method
+    batch_pattern = re.compile(r'Batch:?\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>', re.IGNORECASE)
+    match = batch_pattern.search(str(soup))
+    if match:
+        return match.group(1)
+    
+    # Method 5: Look for strong tag with batch number
+    batch_strong = soup.find("strong", string=lambda text: text and text.isdigit() and len(text.strip()) == 1)
+    if batch_strong:
+        return batch_strong.get_text(strip=True)
+    
+    return None
 
 
 
@@ -728,8 +780,7 @@ def main_flow(username, password, driver_path=None):
         return merged_result
 
     except Exception as e:
-        error_details = f"Error: {str(e)}\nStack: {traceback.format_exc()}"
-        logger.error(f"Failed to process timetable: {error_details}")
+        logger.error(f"Error in main flow: {e}")
         return {"status": "error", "msg": str(e)}
     finally:
         driver.quit()

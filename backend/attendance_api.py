@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-import signal
 
 # Load environment variables
 load_dotenv()
@@ -33,31 +32,10 @@ except Exception as e:
 
 active_scrapers = {}
 
-def timeout_handler(signum, frame):
-    raise TimeoutError("Operation timed out")
-
-# Set a global timeout for any operation
-def with_timeout(seconds, func, *args, **kwargs):
-    # Set the timeout handler
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(seconds)
-    
-    try:
-        result = func(*args, **kwargs)
-        signal.alarm(0)  # Disable the alarm
-        return result
-    except TimeoutError as e:
-        print(f"Operation timed out after {seconds} seconds")
-        raise e
-    finally:
-        signal.alarm(0)  # Ensure the alarm is disabled
-
 def async_scraper(email, password):
     """Run scraper in background."""
     from scrape_attendance import run_scraper
     try:
-        # Set status to running first before starting the actual work
-        active_scrapers[email] = {"status": "running"}
         print(f"Starting scraper for {email}")
         success = run_scraper(email, password)
         print(f"Scraper finished for {email} with success: {success}")
