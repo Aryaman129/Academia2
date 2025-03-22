@@ -37,24 +37,62 @@ LOGIN_URL = BASE_URL
 ATTENDANCE_PAGE_URL = "https://academia.srmist.edu.in/#Page:My_Attendance"
 
 def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--window-size=1920,1080')
-    chrome_options.add_argument('--disable-extensions')
-    chrome_options.add_argument('--disable-infobars')
-    chrome_options.add_argument('--disable-notifications')
-    chrome_options.add_argument('--disable-popup-blocking')
-    chrome_options.add_argument('--start-maximized')
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-infobars")
+    chrome_options.add_argument("--disable-notifications")
+    chrome_options.add_argument("--disable-popup-blocking")
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
-    # Use webdriver_manager to handle ChromeDriver installation
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    # Try multiple possible Chrome binary locations
+    chrome_paths = [
+        "/usr/bin/google-chrome-stable",  # Default Linux path
+        "/usr/bin/google-chrome",         # Alternative Linux path
+        "/opt/google/chrome/chrome",      # Another possible Linux path
+        os.environ.get("CHROME_BIN")      # From environment variable if set
+    ]
+    
+    # Find the first valid Chrome path
+    chrome_binary = None
+    for path in chrome_paths:
+        if path and os.path.exists(path):
+            chrome_binary = path
+            print(f"✅ Found Chrome binary at: {path}")
+            break
+    
+    if chrome_binary:
+        chrome_options.binary_location = chrome_binary
+    else:
+        print("⚠️ No Chrome binary found in standard locations. Attempting to continue without setting binary_location.")
+    
+    try:
+        # Use webdriver_manager to handle ChromeDriver installation
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        print("✅ Successfully initialized Chrome WebDriver")
+    except Exception as e:
+        print(f"❌ Error initializing Chrome WebDriver: {e}")
+        print("⚠️ Trying alternative initialization method...")
+        try:
+            # Alternative method without specifying binary location
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            print("✅ Successfully initialized Chrome WebDriver with alternative method")
+        except Exception as e2:
+            print(f"❌ Alternative initialization also failed: {e2}")
+            raise
     
     # Set page load timeout
     driver.set_page_load_timeout(30)
