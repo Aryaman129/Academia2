@@ -561,66 +561,56 @@ def store_timetable_in_supabase(email, merged_result):
     return True
 
 def setup_driver():
+    print("Setting up Chrome driver...")
+    
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
+    
+    # For Render's free tier, we need to use Selenium Wire approach
     chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_argument("--disable-notifications")
-    chrome_options.add_argument("--disable-popup-blocking")
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    
-    # Try multiple possible Chrome binary locations
-    chrome_paths = [
-        "/usr/bin/google-chrome-stable",  # Default Linux path
-        "/usr/bin/google-chrome",         # Alternative Linux path
-        "/opt/google/chrome/chrome",      # Another possible Linux path
-        os.environ.get("CHROME_BIN")      # From environment variable if set
-    ]
-    
-    # Find the first valid Chrome path
-    chrome_binary = None
-    for path in chrome_paths:
-        if path and os.path.exists(path):
-            chrome_binary = path
-            print(f"✅ Found Chrome binary at: {path}")
-            break
-    
-    if chrome_binary:
-        chrome_options.binary_location = chrome_binary
-    else:
-        print("⚠️ No Chrome binary found in standard locations. Attempting to continue without setting binary_location.")
+    chrome_options.add_argument("--remote-debugging-port=9222")
     
     try:
-        # Use webdriver_manager to handle ChromeDriver installation
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        print("✅ Successfully initialized Chrome WebDriver")
-    except Exception as e:
-        print(f"❌ Error initializing Chrome WebDriver: {e}")
-        print("⚠️ Trying alternative initialization method...")
+        # Try direct approach first
+        print("Attempting to initialize Chrome driver directly...")
+        driver = webdriver.Chrome(options=chrome_options)
+        print("✅ Chrome driver successfully initialized directly")
+        return driver
+    except Exception as e1:
+        print(f"⚠️ Direct initialization failed: {e1}")
+        
         try:
-            # Alternative method without specifying binary location
-            chrome_options = webdriver.ChromeOptions()
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            service = Service(ChromeDriverManager().install())
+            # Try with webdriver-manager
+            print("Attempting to initialize Chrome driver with webdriver-manager...")
+            from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
+            
+            # Instead of using install(), which is causing the tuple error
+            chrome_driver_path = ChromeDriverManager().driver_path
+            if not chrome_driver_path:
+                chrome_driver_path = ChromeDriverManager().install()
+                
+            service = Service(executable_path=chrome_driver_path)
             driver = webdriver.Chrome(service=service, options=chrome_options)
-            print("✅ Successfully initialized Chrome WebDriver with alternative method")
+            print("✅ Chrome driver successfully initialized with webdriver-manager")
+            return driver
         except Exception as e2:
-            print(f"❌ Alternative initialization also failed: {e2}")
-            raise
-    
-    # Set page load timeout
-    driver.set_page_load_timeout(30)
-    return driver
+            print(f"⚠️ Webdriver-manager initialization failed: {e2}")
+            
+            try:
+                # Final attempt with undetected_chromedriver
+                print("Attempting to initialize with undetected_chromedriver...")
+                import undetected_chromedriver as uc
+                driver = uc.Chrome(headless=True, options=chrome_options)
+                print("✅ Chrome driver successfully initialized with undetected_chromedriver")
+                return driver
+            except Exception as e3:
+                print(f"❌ All initialization methods failed: {e3}")
+                print("Please make sure Chrome is installed on this system.")
+                raise Exception("Failed to initialize Chrome driver after multiple attempts")
 
 def main_flow(username, password, driver_path=None):
     """

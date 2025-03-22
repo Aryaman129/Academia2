@@ -8,7 +8,7 @@ services:
       
       # Install Chrome
       wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-      echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
+      echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
       apt-get update
       apt-get install -y google-chrome-stable
       
@@ -29,4 +29,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.11
       - key: CHROMEDRIVER_PATH
-        value: /usr/local/bin/chromedriver 
+        value: /usr/local/bin/chromedriver
+      - key: CHROME_BIN
+        value: "/usr/bin/google-chrome-stable" 
