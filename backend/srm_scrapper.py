@@ -291,7 +291,7 @@ class SRMScraper:
 
             # ===== Critical Fix: Wait longer and switch iframe context if needed =====
             # Wait longer for the page transition to complete
-            time.sleep(5)  # Increase from 2s to 5s
+            time.sleep(2)  # Increase from 2s to 5s
             
             # Check if we need to switch to iframe again
             try:
@@ -330,7 +330,7 @@ class SRMScraper:
                         except Exception as js_error:
                             logger.error(f"JavaScript password entry also failed: {js_error}")
                             raise
-                    time.sleep(3)  # Increased wait between attempts
+                    time.sleep(2)  # Increased wait between attempts
 
             # Click Sign In button with retry
             for attempt in range(3):
@@ -345,7 +345,7 @@ class SRMScraper:
                         raise
                     time.sleep(2)
 
-            time.sleep(5)
+            time.sleep(3)
             
             # Switch back to default content
             self.driver.switch_to.default_content()
@@ -380,7 +380,7 @@ class SRMScraper:
         self.driver.get(ATTENDANCE_PAGE_URL)
         
         try:
-            time.sleep(25)
+            time.sleep(22)
             logger.info("Attendance page loaded successfully")
         except Exception as e:
             logger.warning(f"Timed out waiting for attendance page: {e}")
@@ -708,7 +708,7 @@ class SRMScraper:
         
         logger.info(f"Navigating to timetable page: {TIMETABLE_URL}")
         self.driver.get(TIMETABLE_URL)
-        time.sleep(25)  # Wait for the page to load
+        time.sleep(22)  # Wait for the page to load
         
         html_source = self.driver.page_source
         return html_source

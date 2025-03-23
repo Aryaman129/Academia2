@@ -44,7 +44,7 @@ def async_scraper(email, password):
         print(f"Scraper error for {email}: {e}")
         active_scrapers[email] = {"status": "failed", "error": str(e)}
 
-def delayed_timetable_scraper(email, password, delay_seconds=10):
+def delayed_timetable_scraper(email, password, delay_seconds=1):
     """Run timetable scraper in background with a delay to avoid resource conflicts."""
     time.sleep(delay_seconds)  # Wait before starting to avoid two Chrome instances at once
     active_scrapers[f"timetable_{email}"] = {"status": "waiting"}
