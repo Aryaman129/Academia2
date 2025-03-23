@@ -81,7 +81,6 @@ const Dashboard = () => {
     const [startHour, startMinute] = startTime.split(":").map(Number);
     const [endHour, endMinute] = endTime.split(":").map(Number);
     
-    // Use the React state currentTime for consistency
     const now = currentTime;
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
@@ -127,17 +126,29 @@ const Dashboard = () => {
       console.log("📌 Attendance API Response:", response.data)
       if (response.data.success) {
         // Extract records from response
-        let records = response.data.attendance.records || [];
+        const records = response.data.attendance.records || [];
         
         // Filter out header rows and empty records
-        const filteredRecords = records.filter(record => 
-          record.course_title && 
-          record.course_title.trim() !== "Course Title" &&
-          record.attendance_percentage // Make sure it has percentage data
-        );
+        // Use set to ensure uniqueness of course titles
+        const seen = new Set();
+        const uniqueRecords = [];
         
-        // Store records in their original order
-        setAttendanceData(filteredRecords);
+        for (const record of records) {
+          // Skip invalid records and headers
+          if (!record.course_title || 
+              record.course_title.trim() === "Course Title" || 
+              !record.attendance_percentage) {
+            continue;
+          }
+          
+          // Only add each course once - prevents duplicate entries from API
+          if (!seen.has(record.course_title)) {
+            seen.add(record.course_title);
+            uniqueRecords.push(record);
+          }
+        }
+        
+        setAttendanceData(uniqueRecords);
       } else {
         throw new Error(response.data.error || "No attendance records found.")
       }
@@ -207,39 +218,25 @@ const Dashboard = () => {
       return
     }
     
-    let isFetching = false;
-    let isMounted = true;
-    
-    const fetchData = async () => {
-      if (isFetching) return;
-      
-      isFetching = true;
+    // Simple fetch logic without extra flags
+    const fetchDataOnce = async () => {
       try {
-        const [timetableResult, attendanceResult, marksResult] = await Promise.all([
-          fetchTimetable(), 
-          fetchAttendance(), 
-          fetchMarks()
-        ]);
-        
-        if (isMounted) {
-          setLoading(false);
-        }
+        await fetchTimetable()
+        await fetchAttendance()
+        await fetchMarks()
+        setLoading(false)
       } catch (error) {
-        console.error("Error fetching data:", error);
-        if (isMounted) {
-          setLoading(false);
-        }
-      } finally {
-        isFetching = false;
+        console.error("Error fetching data:", error)
+        setLoading(false)
       }
-    };
+    }
     
-    fetchData();
+    fetchDataOnce()
     
     return () => {
-      isMounted = false;
-    };
-  }, [fetchAttendance, fetchTimetable, fetchMarks, navigate]);
+      // Clean-up logic if needed
+    }
+  }, [fetchAttendance, fetchTimetable, fetchMarks, navigate])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -249,25 +246,22 @@ const Dashboard = () => {
   }
 
   const handleRefresh = () => {
-    setLoading(true);
+    setLoading(true)
     
-    // Use this pattern to prevent duplicate fetches
-    let isFetching = false;
-    const fetchData = async () => {
-      if (isFetching) return;
-      
-      isFetching = true;
+    // Simple sequential fetching to avoid race conditions
+    const refreshData = async () => {
       try {
-        await Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]);
+        await fetchTimetable()
+        await fetchAttendance()
+        await fetchMarks()
       } catch (error) {
-        console.error("Error refreshing data:", error);
+        console.error("Error refreshing data:", error)
       } finally {
-        setLoading(false);
-        isFetching = false;
+        setLoading(false)
       }
-    };
+    }
     
-    fetchData();
+    refreshData()
   }
 
   const getSlotColor = (slot, timeSlot) => {
@@ -328,7 +322,10 @@ const Dashboard = () => {
       {/* Header */}
       <div className="border-b border-gray-800 bg-[#0D1117] py-4 px-6">
         <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-400">{userEmail}</p>
+          <div>
+            <p className="text-sm text-gray-400">{userEmail}</p>
+            <p className="text-xs text-blue-400 mt-1">Academia Student Portal <span className="text-yellow-400">(Testing Version)</span></p>
+          </div>
           <div className="flex gap-2">
             <button onClick={handleRefresh} className="px-3 py-1 text-sm border border-gray-700 rounded">
               Refresh
