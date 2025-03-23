@@ -46,7 +46,7 @@ const Dashboard = () => {
     return dayData?.dayOrder || null;
   };
 
-  // Initialize current day on mount and refresh the time every second
+  // Initialize current day on mount
   useEffect(() => {
     const todayDayOrder = getTodayDayOrder();
     if (todayDayOrder) {
@@ -54,8 +54,10 @@ const Dashboard = () => {
     } else {
       setCurrentDay(1); // Default to Day 1 if today's day order is not found
     }
-    
-    // Update time every second to ensure accurate display
+  }, []);
+
+  // Update current time every second
+  useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000); // Update every second for more accurate time display
@@ -123,8 +125,29 @@ const Dashboard = () => {
       })
       console.log("📌 Attendance API Response:", response.data)
       if (response.data.success) {
-        const records = response.data.attendance.records || [];
-        setAttendanceData(records);
+        // Get records and deduplicate by course_title
+        let records = response.data.attendance.records || [];
+        
+        // Deduplicate records based on course_title
+        const uniqueRecords = records.reduce((unique, record) => {
+          // Skip header rows or empty course titles
+          if (!record.course_title || record.course_title.trim() === "Course Title") {
+            return unique;
+          }
+          
+          // Check if we already have this course
+          const existingIndex = unique.findIndex(
+            item => item.course_title?.toLowerCase() === record.course_title?.toLowerCase()
+          );
+          
+          if (existingIndex === -1) {
+            unique.push(record);
+          }
+          
+          return unique;
+        }, []);
+        
+        setAttendanceData(uniqueRecords);
       } else {
         throw new Error(response.data.error || "No attendance records found.")
       }
@@ -193,8 +216,29 @@ const Dashboard = () => {
       navigate("/")
       return
     }
-    Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]).then(() => setLoading(false))
-  }, [fetchAttendance, fetchTimetable, fetchMarks, navigate])
+    
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      try {
+        await Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]);
+        if (isMounted) {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchAttendance, fetchTimetable, fetchMarks, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -392,9 +436,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-2">
-            {attendanceData
-              .filter(record => record.course_title && record.course_title.trim() !== "Course Title")
-              .map((record, index) => (
+            {attendanceData.map((record, index) => (
                 <div key={index} className="bg-[#1A1F26] rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-start gap-3">
@@ -449,7 +491,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </div>
-            ))}
+              ))}
           </div>
         </div>
 
