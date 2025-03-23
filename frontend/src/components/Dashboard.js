@@ -81,7 +81,8 @@ const Dashboard = () => {
     const [startHour, startMinute] = startTime.split(":").map(Number);
     const [endHour, endMinute] = endTime.split(":").map(Number);
     
-    const now = new Date(); // Always use real-time, not cached time
+    // Use the React state currentTime for consistency
+    const now = currentTime;
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
@@ -125,29 +126,18 @@ const Dashboard = () => {
       })
       console.log("📌 Attendance API Response:", response.data)
       if (response.data.success) {
-        // Get records and deduplicate by course_title
+        // Extract records from response
         let records = response.data.attendance.records || [];
         
-        // Deduplicate records based on course_title
-        const uniqueRecords = records.reduce((unique, record) => {
-          // Skip header rows or empty course titles
-          if (!record.course_title || record.course_title.trim() === "Course Title") {
-            return unique;
-          }
-          
-          // Check if we already have this course
-          const existingIndex = unique.findIndex(
-            item => item.course_title?.toLowerCase() === record.course_title?.toLowerCase()
-          );
-          
-          if (existingIndex === -1) {
-            unique.push(record);
-          }
-          
-          return unique;
-        }, []);
+        // Filter out header rows and empty records
+        const filteredRecords = records.filter(record => 
+          record.course_title && 
+          record.course_title.trim() !== "Course Title" &&
+          record.attendance_percentage // Make sure it has percentage data
+        );
         
-        setAttendanceData(uniqueRecords);
+        // Store records in their original order
+        setAttendanceData(filteredRecords);
       } else {
         throw new Error(response.data.error || "No attendance records found.")
       }
@@ -217,11 +207,20 @@ const Dashboard = () => {
       return
     }
     
+    let isFetching = false;
     let isMounted = true;
     
     const fetchData = async () => {
+      if (isFetching) return;
+      
+      isFetching = true;
       try {
-        await Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]);
+        const [timetableResult, attendanceResult, marksResult] = await Promise.all([
+          fetchTimetable(), 
+          fetchAttendance(), 
+          fetchMarks()
+        ]);
+        
         if (isMounted) {
           setLoading(false);
         }
@@ -230,6 +229,8 @@ const Dashboard = () => {
         if (isMounted) {
           setLoading(false);
         }
+      } finally {
+        isFetching = false;
       }
     };
     
@@ -248,8 +249,25 @@ const Dashboard = () => {
   }
 
   const handleRefresh = () => {
-    setLoading(true)
-    Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]).then(() => setLoading(false))
+    setLoading(true);
+    
+    // Use this pattern to prevent duplicate fetches
+    let isFetching = false;
+    const fetchData = async () => {
+      if (isFetching) return;
+      
+      isFetching = true;
+      try {
+        await Promise.all([fetchTimetable(), fetchAttendance(), fetchMarks()]);
+      } catch (error) {
+        console.error("Error refreshing data:", error);
+      } finally {
+        setLoading(false);
+        isFetching = false;
+      }
+    };
+    
+    fetchData();
   }
 
   const getSlotColor = (slot, timeSlot) => {
@@ -264,7 +282,12 @@ const Dashboard = () => {
     const isBatch2 = batch.includes("2")
     
     // Get the slot code from the course info
-    const slotCode = slot.original_slot || ""
+    let slotCode = "";
+    if (slot.original_slot) {
+      slotCode = slot.original_slot;
+    } else if (slot.courses && slot.courses[0] && slot.courses[0].slot) {
+      slotCode = slot.courses[0].slot;
+    }
     
     // For Batch 2:
     if (isBatch2) {
