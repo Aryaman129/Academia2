@@ -46,7 +46,7 @@ const Dashboard = () => {
     return dayData?.dayOrder || null;
   };
 
-  // Initialize current day on mount
+  // Initialize current day on mount and refresh the time every second
   useEffect(() => {
     const todayDayOrder = getTodayDayOrder();
     if (todayDayOrder) {
@@ -54,6 +54,13 @@ const Dashboard = () => {
     } else {
       setCurrentDay(1); // Default to Day 1 if today's day order is not found
     }
+    
+    // Update time every second to ensure accurate display
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // Update every second for more accurate time display
+    
+    return () => clearInterval(timer);
   }, []);
 
   const handleDayChange = (newDay) => {
@@ -72,9 +79,14 @@ const Dashboard = () => {
     const [startHour, startMinute] = startTime.split(":").map(Number);
     const [endHour, endMinute] = endTime.split(":").map(Number);
     
-    const now = currentTime;
+    const now = new Date(); // Always use real-time, not cached time
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
+    
+    // Only show ongoing classes between 8am and 5pm
+    if (currentHour < 8 || currentHour >= 17) {
+      return false;
+    }
     
     // Convert all times to minutes for easier comparison
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
@@ -97,15 +109,6 @@ const Dashboard = () => {
     const [startTime, endTime] = timeSlot.split("-").map(t => t.trim());
     return `${formatTimeTo12Hour(startTime)} - ${formatTimeTo12Hour(endTime)}`;
   };
-
-  // Update current time every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // Update every minute
-
-    return () => clearInterval(timer);
-  }, []);
 
   // Fetch attendance data
   const fetchAttendance = useCallback(async () => {

@@ -59,10 +59,9 @@ const AttendancePredictionModal = ({
       } else if (months.length > 0) {
         setCurrentMonth(months[0]);
       }
-
-      // Get today's info
-      const todayData = getTodayInfo();
-      setTodayInfo(todayData);
+      
+      // Set today's info
+      setTodayInfo(getTodayInfo());
     }
   }, [isOpen]);
 
@@ -259,18 +258,24 @@ const AttendancePredictionModal = ({
                 <button
                   key={`day-${index}`}
                   onClick={() => {
-                    if (isNonClassDay) return;
+                    if (isNonClassDay) {
+                      // If it's a holiday, show an alert with the holiday name
+                      if (day.holiday) {
+                        alert(`Holiday: ${day.holiday}`);
+                      }
+                      return;
+                    }
                     setSelectedDates(prev => 
                       isSelected
                         ? prev.filter(d => d.toDateString() !== day.date.toDateString())
                         : [...prev, day.date]
                     );
                   }}
-                  disabled={isNonClassDay}
+                  disabled={day.dayOrder === null && !day.holiday}
                   className={`
                     relative p-2 rounded text-center flex flex-col items-center justify-center min-h-[3rem]
                     ${day.holiday 
-                      ? 'bg-yellow-800/30 text-yellow-200/70 cursor-not-allowed' 
+                      ? 'bg-yellow-800/30 text-yellow-200/70 cursor-pointer' 
                       : isNonClassDay 
                         ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed' 
                         : isSelected
