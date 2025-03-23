@@ -84,6 +84,20 @@ const Dashboard = () => {
     return currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes < endTimeInMinutes;
   };
 
+  // Format time to 12-hour format
+  const formatTimeTo12Hour = (timeStr) => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Format time slot to 12-hour format
+  const formatTimeSlot = (timeSlot) => {
+    const [startTime, endTime] = timeSlot.split("-").map(t => t.trim());
+    return `${formatTimeTo12Hour(startTime)} - ${formatTimeTo12Hour(endTime)}`;
+  };
+
   // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -209,7 +223,7 @@ const Dashboard = () => {
     if (isBatch2) {
       // Check if the slot code starts with 'P' (lab slot)
       if (slotCode.startsWith('P')) {
-        return "bg-[#2E7D32]" // Less bright green for lab
+        return "bg-[#1A3D19]" // More dim green for lab
       } else {
         return "bg-[#FFD700]/20" // Yellow for theory
       }
@@ -218,7 +232,7 @@ const Dashboard = () => {
     else {
       // Check if the slot code starts with 'P' (lab slot)
       if (slotCode.startsWith('P')) {
-        return "bg-[#2E7D32]" // Less bright green for lab
+        return "bg-[#1A3D19]" // More dim green for lab
       } else {
         return "bg-[#FFD700]/20" // Yellow for theory
       }
@@ -320,7 +334,7 @@ const Dashboard = () => {
                       <div className={`text-xs ml-4 font-medium ${
                         isCurrentClass ? 'text-blue-400' : 'text-gray-400'
                       }`}>
-                        {timeSlot}
+                        {formatTimeSlot(timeSlot)}
                       </div>
                     </div>
                   </div>

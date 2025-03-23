@@ -380,7 +380,7 @@ class SRMScraper:
         self.driver.get(ATTENDANCE_PAGE_URL)
         
         try:
-            time.sleep(55)
+            time.sleep(25)
             logger.info("Attendance page loaded successfully")
         except Exception as e:
             logger.warning(f"Timed out waiting for attendance page: {e}")
@@ -708,7 +708,7 @@ class SRMScraper:
         
         logger.info(f"Navigating to timetable page: {TIMETABLE_URL}")
         self.driver.get(TIMETABLE_URL)
-        time.sleep(50)  # Wait for the page to load
+        time.sleep(25)  # Wait for the page to load
         
         html_source = self.driver.page_source
         return html_source

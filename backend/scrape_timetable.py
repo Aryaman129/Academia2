@@ -808,8 +808,8 @@ if __name__ == "__main__":
     print("= Auto-detect Batch in Timetable Scraper =")
     print("==========================================")
 
-    user_email = 'pc7882@srmist.edu.in'
-    user_pass = 'Shupi@170803'
+    user_email = input("Enter your email: ")
+    user_pass = input("Enter your password: ")
 
     cd_path = r"C:\Users\Lenovo\Desktop\Academia2\chromedriver-win64\chromedriver.exe"  # <-- Update to your actual ChromeDriver path
     if not os.path.exists(cd_path):
