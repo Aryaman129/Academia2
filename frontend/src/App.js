@@ -2,7 +2,6 @@ import React from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Auth from "./components/Auth";
 import Dashboard from "./components/Dashboard";
-import DarkModeToggle from "./components/DarkModeToggle";
 import "./App.css";
 
 function App() {
@@ -10,8 +9,7 @@ function App() {
     <div className="App">
       <Router>
         <header className="App-header">
-          <h1>Academia Student Portal</h1>
-          <DarkModeToggle />
+          <h1>Academia Student Portal <span className="testing-label">(Testing Version)</span></h1>
         </header>
         <Routes>
           <Route path="/" element={<Auth />} />
