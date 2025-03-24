@@ -9,8 +9,9 @@ const LoadingIndicator = ({ message }) => {
     const messages = [
       "Checking your credentials...",
       "Login successful!",
-      "Gathering your data...",
-      "Almost there, please hold on..."
+      "Almost there, please hold on...",
+      "Processing your data...",
+      "Preparing your dashboard..."
     ];
     
     let messageIndex = 0;
@@ -28,9 +29,10 @@ const LoadingIndicator = ({ message }) => {
         setCurrentMessage(messages[messageIndex]);
         messageIndex++;
       } else {
-        setCurrentMessage(message || "Loading your data...");
+        // Loop back to start if we've gone through all messages
+        messageIndex = 3; // Start from "Fetching your timetable..." again
       }
-    }, 2000);
+    }, 3000);
     
     return () => {
       clearInterval(dotInterval);
@@ -40,9 +42,10 @@ const LoadingIndicator = ({ message }) => {
 
   return (
     <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-gray-900 bg-opacity-75 z-50">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-white">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-white max-w-md">
         <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16 mb-4 mx-auto"></div>
         <p className="text-lg font-semibold text-center">{currentMessage}{dots}</p>
+        <p className="text-xs text-gray-400 text-center mt-4">This might take a minute, please be patient.</p>
       </div>
     </div>
   )

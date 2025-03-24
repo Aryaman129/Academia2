@@ -1,9 +1,10 @@
 "use client"
 import React from "react"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import LoadingIndicator from "./LoadingIndicator"
+import "./Auth.css" // We'll create this file next
 
 // Create axios instance with proper config
 const api = axios.create({
@@ -35,7 +36,52 @@ const Auth = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
+  const [showLogo, setShowLogo] = useState(false)
+  const [activeInput, setActiveInput] = useState(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    // Fade in logo after a short delay
+    const timer = setTimeout(() => {
+      setShowLogo(true)
+    }, 300)
+    
+    // Create particles
+    createParticles()
+    
+    return () => clearTimeout(timer)
+  }, [])
+  
+  // Create floating particles for background effect
+  const createParticles = () => {
+    const container = document.querySelector('.login-container')
+    if (!container) return
+    
+    const particlesContainer = document.createElement('div')
+    particlesContainer.className = 'particles'
+    container.appendChild(particlesContainer)
+    
+    for (let i = 0; i < 20; i++) {
+      const particle = document.createElement('div')
+      particle.className = 'particle'
+      
+      // Random position, size and animation
+      const size = Math.random() * 10 + 3
+      const posX = Math.random() * 100
+      const posY = Math.random() * 100
+      const animationDuration = Math.random() * 10 + 10
+      const animationDelay = Math.random() * 5
+      
+      particle.style.width = `${size}px`
+      particle.style.height = `${size}px`
+      particle.style.left = `${posX}%`
+      particle.style.top = `${posY}%`
+      particle.style.opacity = Math.random() * 0.5 + 0.2
+      particle.style.animation = `float ${animationDuration}s ease-in-out ${animationDelay}s infinite`
+      
+      particlesContainer.appendChild(particle)
+    }
+  }
 
   // Check if server is healthy
   const checkServerHealth = useCallback(async () => {
@@ -73,7 +119,6 @@ const Auth = () => {
         throw new Error("Email and password are required");
       }
   
-      setMessage("Logging in...");
       const response = await api.post("/api/login", { email, password });
   
       if (!response.data.success) {
@@ -84,9 +129,7 @@ const Auth = () => {
       localStorage.setItem("userEmail", response.data.user.email);
       localStorage.setItem("userId", response.data.user.id);
   
-      setMessage("Login successful! Starting attendance scraper...");
-  
-      // Poll for scraper status **instead of waiting on login response**
+      // Poll for scraper status - keep this silent now that we use LoadingIndicator
       let attempts = 0;
       const maxAttempts = 20; // 100 seconds total
       const pollInterval = setInterval(async () => {
@@ -97,84 +140,98 @@ const Auth = () => {
   
         if (status.data.status.status === "completed") {
           clearInterval(pollInterval);
-          setMessage("Data retrieved successfully! Redirecting...");
-          setTimeout(() => navigate("/dashboard"), 1000);
+          setLoading(false);
+          setTimeout(() => navigate("/dashboard"), 500);
         } else if (status.data.status.status === "failed") {
           clearInterval(pollInterval);
-          throw new Error("Failed to retrieve attendance data");
+          throw new Error("Failed to retrieve your data");
         } else if (attempts >= maxAttempts) {
           clearInterval(pollInterval);
-          setMessage("Taking longer than expected. Redirecting to dashboard...");
-          setTimeout(() => navigate("/dashboard"), 1000);
+          setLoading(false);
+          setTimeout(() => navigate("/dashboard"), 500);
         }
       }, 5050);
     } catch (error) {
       console.error("Auth error:", error);
       setError(error.message || "An unexpected error occurred");
-    } finally {
       setLoading(false);
     }
   };
-  
-  
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Academia Student Portal</h2>
-          <p className="mt-2 text-center text-sm text-yellow-600 font-semibold">(Testing Version)</p>
-          <p className="mt-2 text-center text-sm text-gray-600">Sign in to see your attendance records</p>
+    <div className="login-container">
+      <div className="login-background"></div>
+      <div className="login-card-container">
+        <div className={`srm-logo ${showLogo ? 'visible' : ''}`}>
+          <div className="academia-title">
+            <h2 className="text-3xl font-extrabold text-white">Academia</h2>
+            <div className="version-badge">(Testing Version)</div>
+          </div>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+        <div className="login-card">
+          <div className="login-header">
+            <h2 className="text-2xl font-bold text-gray-800">Student Portal</h2>
+            <p className="text-sm text-gray-600 mt-1">Sign in to see your attendance records</p>
           </div>
 
-          {error && <div className="text-red-600 text-sm text-center">{error}</div>}
+          <form className="login-form" onSubmit={handleLogin}>
+            <div className="input-group">
+              <div className={`floating-label ${activeInput === 'email' || email ? 'active' : ''}`}>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  className="input-field"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setActiveInput('email')}
+                  onBlur={() => setActiveInput(null)}
+                />
+                <label htmlFor="email">Email address</label>
+              </div>
+            </div>
 
-          {message && <div className="text-blue-600 text-sm text-center">{message}</div>}
+            <div className="input-group">
+              <div className={`floating-label ${activeInput === 'password' || password ? 'active' : ''}`}>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  className="input-field"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setActiveInput('password')}
+                  onBlur={() => setActiveInput(null)}
+                />
+                <label htmlFor="password">Password</label>
+              </div>
+            </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
-            >
-              {loading ? <LoadingIndicator /> : "Sign In"}
-            </button>
-          </div>
-        </form>
+            {error && <div className="error-message">{error}</div>}
+
+            <div className="login-button-container">
+              <button
+                type="submit"
+                disabled={loading}
+                className="login-button"
+              >
+                <span className="button-text">Sign In</span>
+                <span className="button-icon">→</span>
+              </button>
+            </div>
+          </form>
+          
+          {loading && (
+            <LoadingIndicator message="Checking your credentials..." />
+          )}
+          
+          {!loading && message && (
+            <div className="text-blue-600 text-sm text-center mt-4">{message}</div>
+          )}
+        </div>
       </div>
     </div>
   )
