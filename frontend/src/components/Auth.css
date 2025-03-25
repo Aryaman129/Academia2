@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  background: linear-gradient(135deg, #121212 0%, #1e1e1e 100%);
   position: relative;
   overflow: hidden;
 }
@@ -16,7 +16,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, #1a1a1a, #2d2d2d, #1a1a1a);
+  background: linear-gradient(45deg, #121212, #1e1e1e, #2a2a2a);
   background-size: 400% 400%;
   animation: gradientBG 15s ease infinite;
   z-index: 0;
@@ -37,19 +37,42 @@
 }
 
 .login-card {
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(10px);
+  background: rgba(25, 25, 30, 0.85);
+  backdrop-filter: blur(12px);
   border-radius: 20px;
   padding: 40px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(55, 55, 70, 0.3);
   transform: translateY(0);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .login-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background: linear-gradient(45deg, #2d2d39, transparent, #2d2d39, transparent);
+  background-size: 400% 400%;
+  animation: glowBG 10s linear infinite;
+  z-index: -1;
+  border-radius: 24px;
+  filter: blur(12px);
+}
+
+@keyframes glowBG {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
 }
 
 .login-card h1 {
@@ -86,28 +109,29 @@
 
 .form-group input {
   width: 100%;
-  padding: 12px 15px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  padding: 15px 18px;
+  background: rgba(30, 30, 40, 0.7);
+  border: 1px solid rgba(70, 70, 90, 0.3);
+  border-radius: 12px;
   color: #ffffff;
   font-size: 16px;
   transition: all 0.3s ease;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .form-group input:focus {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: #ffd700;
+  background: rgba(40, 40, 55, 0.7);
+  border-color: #4d4dff;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+  box-shadow: 0 0 0 3px rgba(77, 77, 255, 0.2), inset 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .form-group label {
   position: absolute;
-  left: 15px;
+  left: 18px;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(200, 200, 220, 0.7);
   transition: all 0.3s ease;
   pointer-events: none;
   font-size: 16px;
@@ -117,29 +141,32 @@
 .form-group input:not(:placeholder-shown) + label {
   top: 0;
   font-size: 12px;
-  color: #ffd700;
-  background: rgba(30, 30, 30, 0.95);
-  padding: 0 5px;
+  color: #4d4dff;
+  background: rgba(25, 25, 30, 0.9);
+  padding: 0 8px;
+  border-radius: 4px;
 }
 
 .login-button {
-  background: linear-gradient(45deg, #ffd700, #ffa500);
-  color: #000000;
-  padding: 12px 20px;
+  background: linear-gradient(45deg, #3636e3, #5454ff);
+  color: white;
+  padding: 14px 22px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  margin-top: 10px;
+  margin-top: 15px;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
 }
 
 .login-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(45deg, #4646f3, #6464ff);
 }
 
 .login-button:active {
@@ -167,19 +194,20 @@
 }
 
 .loading-indicator {
-  background: rgba(30, 30, 30, 0.95);
-  border-radius: 10px;
+  background: rgba(30, 30, 40, 0.9);
+  border-radius: 12px;
   padding: 20px;
   text-align: center;
   margin-top: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(70, 70, 90, 0.3);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #ffd700;
+  border: 3px solid rgba(70, 70, 90, 0.15);
+  border-top-color: #4d4dff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 15px;
@@ -218,7 +246,7 @@
 
 .particle {
   position: absolute;
-  background: rgba(255, 215, 0, 0.1);
+  background: rgba(77, 77, 255, 0.1);
   border-radius: 50%;
   pointer-events: none;
   animation: float 20s infinite linear;
@@ -248,6 +276,10 @@
   }
   
   .form-group input {
-    padding: 10px 12px;
+    padding: 12px 15px;
+  }
+  
+  .box {
+    opacity: 0.03;
   }
 } 
