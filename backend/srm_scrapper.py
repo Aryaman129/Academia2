@@ -442,7 +442,7 @@ class SRMScraper:
             return None
 
     def parse_and_save_attendance(self, html, driver):
-        """Parse attendance data and save to Supabase with proper delays"""
+        """Parse attendance data and save to Supabase"""
         try:
             logger.info("Parsing and saving attendance data...")
             soup = BeautifulSoup(html, 'html.parser')
@@ -452,9 +452,6 @@ class SRMScraper:
             if not registration_number:
                 raise Exception("Failed to extract registration number")
                 
-            # Add delay before database operations
-            time.sleep(1)
-            
             # Get user ID
             user_query = supabase.table("users").select("id").eq("email", self.email).execute()
             if not user_query.data:
@@ -480,9 +477,6 @@ class SRMScraper:
                         "faculty": cols[5].text.strip()
                     }
                     attendance_records.append(record)
-            
-            # Add delay before final database operation
-            time.sleep(1)
             
             # Prepare attendance data
             attendance_data = {
