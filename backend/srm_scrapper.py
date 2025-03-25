@@ -478,31 +478,43 @@ class SRMScraper:
                     }
                     attendance_records.append(record)
             
-            # Prepare attendance data
-            attendance_data = {
-                "user_id": user_id,
-                "attendance_data": {
-                    "registration_number": registration_number,
-                    "last_updated": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-                    "records": attendance_records
-                }
+            # Build the attendance data JSON
+            attendance_json = {
+                "registration_number": registration_number,
+                "last_updated": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                "records": attendance_records
             }
             
             # Check if attendance record exists
-            existing = supabase.table("attendance").select("*").eq("user_id", user_id).execute()
+            try:
+                sel_resp = supabase.table("attendance").select("id").eq("user_id", user_id).execute()
+            except Exception as e:
+                logger.error(f"Database operation timed out or failed: {e}")
+                sel_resp = None
             
-            if existing.data and len(existing.data) > 0:
+            if sel_resp and sel_resp.data and len(sel_resp.data) > 0:
                 # Update existing record
-                update_resp = supabase.table("attendance").update(attendance_data).eq("user_id", user_id).execute()
-                if not update_resp.data:
+                update_resp = supabase.table("attendance").update({
+                    "attendance_data": attendance_json,
+                    "updated_at": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+                }).eq("user_id", user_id).execute()
+                
+                if update_resp.data:
+                    logger.info("✅ Attendance JSON updated successfully")
+                else:
                     raise Exception("Failed to update attendance data")
             else:
                 # Insert new record
-                insert_resp = supabase.table("attendance").insert(attendance_data).execute()
-                if not insert_resp.data:
+                insert_resp = supabase.table("attendance").insert({
+                    "user_id": user_id,
+                    "attendance_data": attendance_json
+                }).execute()
+                
+                if insert_resp.data:
+                    logger.info("✅ Attendance JSON inserted successfully")
+                else:
                     raise Exception("Failed to insert attendance data")
             
-            logger.info("✅ Attendance data saved successfully")
             return True
             
         except Exception as e:
