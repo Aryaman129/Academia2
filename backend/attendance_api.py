@@ -17,18 +17,9 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
-app.config['TIMEOUT'] = 30
 
 # Enable CORS for your frontend domain
 CORS(app, origins=["https://academia-khaki.vercel.app", "http://localhost:3000"])
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except Exception as e:
-    print(f"Failed to initialize Supabase client: {e}")
-    raise
 
 active_scrapers = {}
 
@@ -125,35 +116,43 @@ def login_route():
         print(f"Login attempt for email: {email}")
 
         # 1) Check if user exists by email
-        resp = supabase.table("users").select("*").eq("email", email).execute()
-        if not resp.data or len(resp.data) == 0:
-            # 2) Create new user with empty registration_number
-            new_user = {
-                "email": email,
-                "password_hash": generate_password_hash(password, method='pbkdf2:sha256'),
-                "registration_number": ""
-            }
-            insert_resp = supabase.table("users").insert(new_user).execute()
-            user = insert_resp.data[0]
-        else:
-            user = resp.data[0]
-            try:
-                # Try to verify with existing hash
-                if not check_password_hash(user["password_hash"], password):
-                    # If verification fails, update to new hash
-                    new_hash = generate_password_hash(password, method='pbkdf2:sha256')
-                    supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
-                    updated_resp = supabase.table("users").select("*").eq("id", user["id"]).execute()
-                    user = updated_resp.data[0]
-            except ValueError as e:
-                if "unsupported hash type" in str(e):
-                    # If old hash is incompatible, update to new hash
-                    new_hash = generate_password_hash(password, method='pbkdf2:sha256')
-                    supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
-                    updated_resp = supabase.table("users").select("*").eq("id", user["id"]).execute()
-                    user = updated_resp.data[0]
-                else:
-                    raise
+        try:
+            resp = supabase.table("users").select("*").eq("email", email).execute()
+            if not resp.data or len(resp.data) == 0:
+                # 2) Create new user with empty registration_number
+                new_user = {
+                    "email": email,
+                    "password_hash": generate_password_hash(password, method='pbkdf2:sha256'),
+                    "registration_number": ""
+                }
+                insert_resp = supabase.table("users").insert(new_user).execute()
+                if not insert_resp.data:
+                    raise Exception("Failed to create user record")
+                user = insert_resp.data[0]
+            else:
+                user = resp.data[0]
+                try:
+                    # Try to verify with existing hash
+                    if not check_password_hash(user["password_hash"], password):
+                        # If verification fails, update to new hash
+                        new_hash = generate_password_hash(password, method='pbkdf2:sha256')
+                        update_resp = supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
+                        if not update_resp.data:
+                            raise Exception("Failed to update password hash")
+                        user = update_resp.data[0]
+                except ValueError as e:
+                    if "unsupported hash type" in str(e):
+                        # If old hash is incompatible, update to new hash
+                        new_hash = generate_password_hash(password, method='pbkdf2:sha256')
+                        update_resp = supabase.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
+                        if not update_resp.data:
+                            raise Exception("Failed to update password hash")
+                        user = update_resp.data[0]
+                    else:
+                        raise
+        except Exception as e:
+            print(f"Database error during user lookup/creation: {e}")
+            return jsonify({"success": False, "error": "Database operation failed"}), 500
 
         # 4) Generate token with user["id"]
         token = jwt.encode({
