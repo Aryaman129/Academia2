@@ -1,0 +1,7 @@
+flask
+flask-cors
+selenium
+webdriver-manager
+pyjwt
+python-jose
+supabase 

@@ -347,24 +347,101 @@ def parse_and_save_attendance(html, driver):
             cols = row.find_all("td")
             if len(cols) >= 8:
                 try:
+                    # Check if this is a lab course by looking for "Lab" in the course code or title
+                    course_code = cols[0].text.strip()
+                    course_title = cols[1].text.strip()
+                    is_lab = "Lab" in course_code or "Lab" in course_title or "LAB" in course_code
+                    
+                    # For lab courses, we need to handle potentially missing data
+                    if is_lab:
+                        print(f"🔬 Detected lab course: {course_code} - {course_title}")
+                    
+                    # Extract attendance data, handling potential issues with labs
+                    try:
+                        hours_conducted = int(cols[5].text.strip()) if cols[5].text.strip().isdigit() else 0
+                    except:
+                        print(f"⚠️ Error parsing hours conducted for {course_code}, defaulting to 0")
+                        hours_conducted = 0
+                        
+                    try:
+                        hours_absent = int(cols[6].text.strip()) if cols[6].text.strip().isdigit() else 0
+                    except:
+                        print(f"⚠️ Error parsing hours absent for {course_code}, defaulting to 0")
+                        hours_absent = 0
+                        
+                    try:
+                        attendance_percent_text = cols[7].text.strip()
+                        attendance_percentage = float(attendance_percent_text) if attendance_percent_text.replace('.', '', 1).isdigit() else 0.0
+                    except:
+                        print(f"⚠️ Error parsing attendance percentage for {course_code}, calculating from hours")
+                        # Calculate percentage if possible
+                        if hours_conducted > 0:
+                            attendance_percentage = ((hours_conducted - hours_absent) / hours_conducted) * 100
+                        else:
+                            attendance_percentage = 0.0
+                    
                     record = {
-                        "course_code": cols[0].text.strip(),
-                        "course_title": cols[1].text.strip(),
+                        "course_code": course_code,
+                        "course_title": course_title,
                         "category": cols[2].text.strip(),
                         "faculty": cols[3].text.strip(),
                         "slot": cols[4].text.strip(),
-                        "hours_conducted": int(cols[5].text.strip()) if cols[5].text.strip().isdigit() else 0,
-                        "hours_absent": int(cols[6].text.strip()) if cols[6].text.strip().isdigit() else 0,
-                        "attendance_percentage": float(cols[7].text.strip()) if cols[7].text.strip().replace('.', '', 1).isdigit() else 0.0
+                        "hours_conducted": hours_conducted,
+                        "hours_absent": hours_absent,
+                        "attendance_percentage": attendance_percentage,
+                        "is_lab": is_lab
                     }
                     attendance_records.append(record)
+                    print(f"✅ Parsed attendance for: {course_code}")
                 except Exception as ex:
                     print(f"⚠️ Error parsing row: {ex}")
+                    traceback.print_exc()
+
+    # Special handling for semiconductor lab or any other problematic labs
+    lab_courses = [rec for rec in attendance_records if rec["is_lab"]]
+    print(f"📊 Found {len(lab_courses)} lab courses")
+    
+    # Check for semiconductor lab specifically - fix if needed
+    semiconductor_labs = [rec for rec in attendance_records if "SEMICOND" in rec["course_code"].upper() or "SEMICOND" in rec["course_title"].upper()]
+    if not semiconductor_labs:
+        print("🔍 Checking for semiconductor lab through alternative methods...")
+        # Try to find it in the page directly
+        semiconductor_elements = soup.find_all(string=lambda text: "SEMICOND" in text.upper() if text else False)
+        if semiconductor_elements:
+            print(f"📌 Found semiconductor lab mentions: {len(semiconductor_elements)}")
+            # Try to extract data around these elements
+            
+            # Add fallback record if needed
+            for element in semiconductor_elements:
+                parent_row = element.find_parent("tr")
+                if parent_row:
+                    cols = parent_row.find_all("td")
+                    if len(cols) >= 4:
+                        # Create partial record with available data
+                        course_code = cols[0].text.strip() if len(cols) > 0 else "SEMICONDUCTOR LAB"
+                        course_title = cols[1].text.strip() if len(cols) > 1 else "Semiconductor Devices Lab"
+                        
+                        # Check if we already have this course
+                        if not any(rec["course_code"] == course_code for rec in attendance_records):
+                            record = {
+                                "course_code": course_code,
+                                "course_title": course_title,
+                                "category": cols[2].text.strip() if len(cols) > 2 else "PC",
+                                "faculty": cols[3].text.strip() if len(cols) > 3 else "Unknown",
+                                "slot": cols[4].text.strip() if len(cols) > 4 else "L3+L4",
+                                "hours_conducted": 0,  # Default values
+                                "hours_absent": 0,
+                                "attendance_percentage": 0.0,
+                                "is_lab": True,
+                                "data_source": "fallback"  # Mark as fallback data
+                            }
+                            attendance_records.append(record)
+                            print(f"✅ Added fallback semiconductor lab record")
 
     # Optional: Deduplicate records if needed
     unique_records = {}
     for rec in attendance_records:
-        key = (registration_number, rec["course_code"], rec["category"])
+        key = (registration_number, rec["course_code"])
         if key not in unique_records:
             unique_records[key] = rec
     attendance_records = list(unique_records.values())
