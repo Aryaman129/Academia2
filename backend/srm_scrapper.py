@@ -445,76 +445,89 @@ class SRMScraper:
         """Parse attendance data and save to Supabase"""
         try:
             logger.info("Parsing and saving attendance data...")
-            soup = BeautifulSoup(html, 'html.parser')
-            
-            # Extract registration number
+            soup = BeautifulSoup(html, "html.parser")
             registration_number = self.extract_registration_number(soup)
             if not registration_number:
-                raise Exception("Failed to extract registration number")
-                
-            # Get user ID
-            user_query = supabase.table("users").select("id").eq("email", self.email).execute()
-            if not user_query.data:
-                raise Exception("User not found in database")
-            user_id = user_query.data[0]["id"]
-            
-            # Parse attendance data
+                logger.error("Could not find Registration Number!")
+                return False
+            logger.info(f"Extracted Registration Number: {registration_number}")
+
+            # Get or create the user in Supabase
+            user_id = self.get_user_id(registration_number)
+            if not user_id:
+                logger.error("Could not retrieve or create user in Supabase.")
+                return False
+
+            # Extract all attendance tables from the page
+            attendance_tables = [table for table in soup.find_all("table") if "Course Code" in table.text]
+            if not attendance_tables:
+                logger.error("No attendance table found!")
+                return False
+
+            # Collect attendance records from all tables
             attendance_records = []
-            table = soup.find('table', {'class': 'table'})
-            if not table:
-                raise Exception("Attendance table not found")
-                
-            rows = table.find_all('tr')[1:]  # Skip header row
-            for row in rows:
-                cols = row.find_all('td')
-                if len(cols) >= 6:
-                    record = {
-                        "course_code": cols[0].text.strip(),
-                        "course_title": cols[1].text.strip(),
-                        "total_classes": int(cols[2].text.strip() or 0),
-                        "attended_classes": int(cols[3].text.strip() or 0),
-                        "attendance_percentage": float(cols[4].text.strip().replace('%', '') or 0),
-                        "faculty": cols[5].text.strip()
-                    }
-                    attendance_records.append(record)
-            
-            # Build the attendance data JSON
+            for attendance_table in attendance_tables:
+                rows = attendance_table.find_all("tr")[1:]  # skip header row
+                for row in rows:
+                    cols = row.find_all("td")
+                    if len(cols) >= 8:
+                        try:
+                            record = {
+                                "course_code": cols[0].text.strip(),
+                                "course_title": cols[1].text.strip(),
+                                "category": cols[2].text.strip(),
+                                "faculty": cols[3].text.strip(),
+                                "slot": cols[4].text.strip(),
+                                "hours_conducted": int(cols[5].text.strip()) if cols[5].text.strip().isdigit() else 0,
+                                "hours_absent": int(cols[6].text.strip()) if cols[6].text.strip().isdigit() else 0,
+                                "attendance_percentage": float(cols[7].text.strip()) if cols[7].text.strip().replace('.', '', 1).isdigit() else 0.0
+                            }
+                            attendance_records.append(record)
+                        except Exception as ex:
+                            logger.warning(f"Error parsing row: {ex}")
+
+            # Optional: Deduplicate records if needed
+            unique_records = {}
+            for rec in attendance_records:
+                key = (registration_number, rec["course_code"], rec["category"])
+                if key not in unique_records:
+                    unique_records[key] = rec
+            attendance_records = list(unique_records.values())
+            logger.info(f"Parsed {len(attendance_records)} unique attendance records.")
+
+            # Build the JSON object for all attendance data
             attendance_json = {
                 "registration_number": registration_number,
                 "last_updated": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
                 "records": attendance_records
             }
-            
-            # Check if attendance record exists
+
+            # Upsert the JSON object in Supabase
             try:
                 sel_resp = supabase.table("attendance").select("id").eq("user_id", user_id).execute()
             except Exception as e:
                 logger.error(f"Database operation timed out or failed: {e}")
                 sel_resp = None
-            
+
             if sel_resp and sel_resp.data and len(sel_resp.data) > 0:
-                # Update existing record
-                update_resp = supabase.table("attendance").update({
+                up_resp = supabase.table("attendance").update({
                     "attendance_data": attendance_json,
                     "updated_at": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
                 }).eq("user_id", user_id).execute()
-                
-                if update_resp.data:
-                    logger.info("✅ Attendance JSON updated successfully")
+                if up_resp.data:
+                    logger.info("✅ Attendance JSON updated successfully.")
                 else:
-                    raise Exception("Failed to update attendance data")
+                    logger.error("❌ Failed to update attendance JSON.")
             else:
-                # Insert new record
-                insert_resp = supabase.table("attendance").insert({
+                in_resp = supabase.table("attendance").insert({
                     "user_id": user_id,
                     "attendance_data": attendance_json
                 }).execute()
-                
-                if insert_resp.data:
-                    logger.info("✅ Attendance JSON inserted successfully")
+                if in_resp.data:
+                    logger.info("✅ Attendance JSON inserted successfully.")
                 else:
-                    raise Exception("Failed to insert attendance data")
-            
+                    logger.error("❌ Failed to insert attendance JSON.")
+
             return True
             
         except Exception as e:
