@@ -6,6 +6,7 @@ const RefreshButton = () => {
     lastUpdate: null,
     message: ''
   });
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   const refreshData = async () => {
     setIsRefreshing(true);
@@ -67,6 +68,24 @@ const RefreshButton = () => {
     }
   };
 
+  // Check last update time
+  const checkLastUpdate = async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/refresh-status', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      setLastUpdate({
+        attendance: new Date(data.attendance_last_update).toLocaleString(),
+        marks: new Date(data.marks_last_update).toLocaleString()
+      });
+    }
+  };
+
   return (
     <div className="refresh-container">
       <button 
@@ -88,41 +107,16 @@ const RefreshButton = () => {
           Last updated: {new Date(status.lastUpdate).toLocaleString()}
         </div>
       )}
+
+      {lastUpdate && (
+        <div>
+          <p>Last Attendance Update: {lastUpdate.attendance}</p>
+          <p>Last Marks Update: {lastUpdate.marks}</p>
+        </div>
+      )}
     </div>
   );
 };
 
 // Add some basic styles
 const styles = `
-.refresh-container {
-  padding: 15px;
-  border-radius: 8px;
-  background: #f5f5f5;
-}
-
-.refresh-button {
-  padding: 10px 20px;
-  border-radius: 5px;
-  border: none;
-  background: #007bff;
-  color: white;
-  cursor: pointer;
-}
-
-.refresh-button:disabled {
-  background: #ccc;
-}
-
-.status-message {
-  margin-top: 10px;
-  color: #666;
-}
-
-.last-update {
-  margin-top: 5px;
-  font-size: 0.9em;
-  color: #888;
-}
-`;
-
-export default RefreshButton; 

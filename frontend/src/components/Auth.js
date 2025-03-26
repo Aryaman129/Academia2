@@ -40,6 +40,7 @@ const Auth = () => {
   const [logoVisible, setLogoVisible] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
   const navigate = useNavigate()
+  const emailSuffix = "@srmist.edu.in"
 
   useEffect(() => {
     // Animate logo after page load
@@ -106,6 +107,25 @@ const Auth = () => {
     }
   }, [])
 
+  // Handle email input change
+  const handleEmailChange = (e) => {
+    let value = e.target.value.toLowerCase()
+    
+    // Remove the suffix if it's already there
+    if (value.endsWith(emailSuffix)) {
+      value = value.slice(0, -emailSuffix.length)
+    }
+    
+    // Remove any @ symbols the user types
+    value = value.replace(/@/g, '')
+    
+    // Set the email state with just the username part
+    setEmail(value)
+  }
+
+  // Get the full email with suffix
+  const getFullEmail = () => `${email}${emailSuffix}`
+
   // Handle login
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -118,7 +138,7 @@ const Auth = () => {
         throw new Error("Email and password are required")
       }
   
-      const response = await api.post("/api/login", { email, password })
+      const response = await api.post("/api/login", { email: getFullEmail(), password })
   
       if (!response.data.success) {
         throw new Error(response.data.error || "Login failed")
@@ -213,18 +233,20 @@ const Auth = () => {
 
           <form className="login-form" onSubmit={handleLogin}>
             <div className="form-group">
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                placeholder=" "
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setActiveInput('email')}
-                onBlur={() => setActiveInput(null)}
-              />
-              <label htmlFor="email">Email address</label>
+              <div className="email-input-wrapper">
+                <input
+                  id="email"
+                  type="text"
+                  required
+                  placeholder=" "
+                  value={email}
+                  onChange={handleEmailChange}
+                  onFocus={() => setActiveInput('email')}
+                  onBlur={() => setActiveInput(null)}
+                />
+                <span className="email-suffix">{emailSuffix}</span>
+                <label htmlFor="email">Email address</label>
+              </div>
             </div>
 
             <div className="form-group">

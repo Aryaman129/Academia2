@@ -307,6 +307,32 @@ const Dashboard = () => {
     }
   }
 
+  const getAttendanceStatus = (attended, total) => {
+    const percentage = (attended / total) * 100;
+    const classesNeeded = Math.ceil((0.75 * total - attended) / 0.25);
+    const margin = Math.floor(attended - (0.75 * total));
+
+    if (percentage < 75) {
+      return {
+        type: 'required',
+        message: `Need ${classesNeeded} more`,
+        color: 'low'
+      };
+    } else if (percentage === 75) {
+      return {
+        type: 'warning',
+        message: 'At threshold',
+        color: 'medium'
+      };
+    } else {
+      return {
+        type: 'margin',
+        message: `Margin: ${margin}`,
+        color: 'high'
+      };
+    }
+  };
+
   if (loading) return <LoadingIndicator message="Fetching your data..." />
 
   if (error)
@@ -461,52 +487,52 @@ const Dashboard = () => {
           </div>
           <div className="space-y-2">
             {attendanceData.map((record, index) => (
-                <div key={index} className="bg-[#1A1F26] rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-medium">{record.course_title}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-400">{record.course_code}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          record.category === 'Theory' 
-                            ? 'bg-blue-500/20 text-blue-400' 
-                            : 'bg-green-500/20 text-green-400'
-                        }`}>
-                          {record.category}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <span className="text-green-400 text-sm" title="Classes Attended">
-                          {record.hours_conducted - record.hours_absent}
-                        </span>
-                        <span className="text-gray-400">/</span>
-                        <span className="text-sm" title="Total Classes">
-                          {record.hours_conducted}
-                        </span>
-                        <span className="text-red-400 text-xs ml-2" title="Classes Missed">
-                          ({record.hours_absent} missed)
-                        </span>
-                      </div>
-                      <div className={`text-sm font-medium w-20 text-right ${
-                        parseFloat(record.attendance_percentage) >= 75 
-                          ? "text-green-400" 
-                          : parseFloat(record.attendance_percentage) >= 65
-                            ? "text-yellow-400"
-                            : "text-red-400"
+              <div key={index} className="bg-[#1A1F26] rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium">{record.course_title}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-gray-400">{record.course_code}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        record.category === 'Theory' 
+                          ? 'bg-blue-500/20 text-blue-400' 
+                          : 'bg-green-500/20 text-green-400'
                       }`}>
-                        {record.attendance_percentage}%
-                        {parseFloat(record.attendance_percentage) < 75 && (
-                          <div className="text-xs text-red-400 font-normal">
-                            Need {Math.ceil((75 * record.hours_conducted - (record.hours_conducted - record.hours_absent) * 100) / 25)} more
-                          </div>
-                        )}
-                      </div>
+                        {record.category}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-400 text-sm" title="Classes Attended">
+                        {record.hours_conducted - record.hours_absent}
+                      </span>
+                      <span className="text-gray-400">/</span>
+                      <span className="text-sm" title="Total Classes">
+                        {record.hours_conducted}
+                      </span>
+                      <span className="text-red-400 text-xs ml-2" title="Classes Missed">
+                        ({record.hours_absent} missed)
+                      </span>
+                    </div>
+                    <div className={`text-sm font-medium w-20 text-right ${
+                      parseFloat(record.attendance_percentage) >= 75 
+                        ? "text-green-400" 
+                        : parseFloat(record.attendance_percentage) >= 70
+                          ? "text-yellow-400"
+                          : "text-red-400"
+                    }`}>
+                      {record.attendance_percentage}%
+                      {parseFloat(record.attendance_percentage) < 75 && (
+                        <div className="text-xs text-red-400 font-normal">
+                          {getAttendanceStatus(record.hours_conducted - record.hours_absent, record.hours_conducted).message}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
         </div>
 

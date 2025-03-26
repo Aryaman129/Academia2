@@ -7,6 +7,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [checkingSession, setCheckingSession] = useState(true);
+  const [isQuickLogin, setIsQuickLogin] = useState(true);
   
   const navigate = useNavigate();
   
@@ -76,6 +77,34 @@ const Login = () => {
     }
   };
   
+  const tryQuickLogin = async () => {
+    try {
+      const response = await fetch('/api/quick-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+
+      if (response.ok) {
+        // Existing session found, use it
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        // Redirect to dashboard
+        return true;
+      } else {
+        // Need full login
+        setIsQuickLogin(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Quick login failed:', error);
+      setIsQuickLogin(false);
+      return false;
+    }
+  };
+  
   if (checkingSession) {
     return <div>Checking session...</div>;
   }
@@ -94,15 +123,17 @@ const Login = () => {
             required
           />
         </div>
-        <div>
-          <label>Password:</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
+        {!isQuickLogin && (
+          <div>
+            <label>Password:</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+        )}
         <button type="submit" disabled={loading}>
           {loading ? 'Logging in...' : 'Login'}
         </button>

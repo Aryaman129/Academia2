@@ -52,77 +52,54 @@ def login():
     password = data.get('password')
 
     try:
-        print(f"🔄 Starting login process for {email}")
-        
-        # STEP 1: Get cookies using srm_login.py
-        try:
-            from srm_login import get_srm_cookies
-            print("📝 Extracting cookies using srm_login.py...")
-            cookies = get_srm_cookies(email, password)
-            
-            if not cookies:
-                print("❌ No cookies extracted!")
-                return jsonify({'error': 'Failed to extract cookies'}), 401
-                
-            print(f"✅ Successfully extracted {len(cookies)} cookies: {list(cookies.keys())}")
-            
-            # Save cookies to file for debugging
-            with open('debug_cookies.json', 'w') as f:
-                json.dump(cookies, f)
-            print("✅ Saved cookies to debug file")
-            
-        except Exception as e:
-            print(f"❌ Cookie extraction failed: {str(e)}")
-            return jsonify({'error': f'Cookie extraction failed: {str(e)}'}), 500
-
-        # STEP 2: Create JWT token
+        # 1. Get cookies and create token
+        cookies = get_srm_cookies(email, password)
         token = create_jwt_token(email)
-        print("✅ Created JWT token")
-
-        # STEP 3: Store in Supabase
-        try:
-            cookie_data = {
-                'email': email,
-                'cookies': cookies,
-                'token': token,
-                'updated_at': datetime.now().isoformat()
-            }
-            
-            # Delete old record first
-            supabase.table('user_cookies').delete().eq('email', email).execute()
-            print("✅ Deleted old cookie record")
-            
-            # Insert new record
-            result = supabase.table('user_cookies').insert(cookie_data).execute()
-            print("✅ Stored new cookie record")
-            
-            # Verify storage
-            verify = supabase.table('user_cookies').select('*').eq('email', email).execute()
-            if verify.data:
-                stored_cookies = verify.data[0].get('cookies', {})
-                print(f"✅ Verified storage - found {len(stored_cookies)} cookies: {list(stored_cookies.keys())}")
-            else:
-                print("⚠️ Could not verify cookie storage")
+        
+        # 2. Store in Supabase
+        store_cookies_and_token(email, cookies, token)
+        
+        # 3. Run full scraper with modified order
+        def run_ordered_scraper():
+            try:
+                scraper = SRMScraper(email, password)
+                driver = scraper.setup_driver()
                 
-        except Exception as e:
-            print(f"❌ Supabase storage error: {str(e)}")
-            return jsonify({'error': f'Failed to store cookies: {str(e)}'}), 500
-
-        # STEP 4: Start scrapers in background
-        print("🔄 Starting scrapers in background...")
+                print("🔄 Starting full data scrape...")
+                
+                # CHANGE 1: Get timetable first (was previously after attendance)
+                print("📅 Getting timetable data first...")
+                timetable_html = scraper.get_timetable_page()
+                if timetable_html:
+                    timetable_success = scraper.parse_and_save_timetable(timetable_html, driver)
+                    print(f"✅ Timetable scraping: {'Success' if timetable_success else 'Failed'}")
+                
+                # CHANGE 2: Then get attendance (was previously first)
+                print("📊 Getting attendance data...")
+                attendance_html = scraper.get_attendance_page()
+                if attendance_html:
+                    attendance_success = scraper.parse_and_save_attendance(attendance_html, driver)
+                    marks_success = scraper.parse_and_save_marks(attendance_html, driver)
+                    print(f"✅ Attendance scraping: {'Success' if attendance_success else 'Failed'}")
+                    print(f"✅ Marks scraping: {'Success' if marks_success else 'Failed'}")
+                
+                driver.quit()
+                print("✅ Full scrape completed!")
+                
+            except Exception as e:
+                print(f"❌ Scraper error: {str(e)}")
+                traceback.print_exc()
+        
+        # Start ordered scraper in background
         threading.Thread(
-            target=start_scrapers,
-            args=(email, password),
+            target=run_ordered_scraper,
             daemon=True
         ).start()
 
-        # STEP 5: Return success response
         return jsonify({
             'success': True,
             'token': token,
-            'user': {'email': email},
-            'cookieCount': len(cookies),
-            'cookieNames': list(cookies.keys())
+            'message': 'Login successful, data scraping started'
         })
 
     except Exception as e:
@@ -419,82 +396,67 @@ def verify_session():
         token = auth_header.split(' ')[1]
         email = verify_token(token)
         
-        if not email:
-            return jsonify({'error': 'Invalid token'}), 401
-            
-        # Get cookies from Supabase
-        cookies = verify_and_get_cookies(email)
-        if not cookies:
-            return jsonify({'error': 'No session found'}), 401
-            
-        return jsonify({
-            'status': 'success',
-            'email': email,
-            'cookieCount': len(cookies)
-        })
+        # Get existing data from database
+        attendance_data = supabase.table('attendance').select('*').eq('user_id', email).execute()
         
+        if attendance_data.data:
+            # Data exists, return immediately without scraping
+            return jsonify({
+                'status': 'success',
+                'email': email,
+                'hasData': True
+            })
+        else:
+            # No data found, need to scrape
+            return jsonify({
+                'status': 'success',
+                'email': email,
+                'hasData': False
+            })
+            
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/refresh-data', methods=['POST'])
 def refresh_data():
-    """Refresh only attendance and marks data using stored cookies"""
     try:
-        # Verify user's token
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({'error': 'No token provided'}), 401
-            
-        token = auth_header.split(' ')[1]
+        # 1. First verify your token
+        token = request.headers.get('Authorization').split(' ')[1]
         email = verify_token(token)
         
-        # Get stored cookies from Supabase
+        # 2. Get your stored cookies from Supabase
         stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
-        if not stored_data.data:
-            return jsonify({'error': 'No stored session found'}), 404
-            
         cookies = stored_data.data[0].get('cookies', {})
         
-        # Start only attendance scraper in background
+        # 3. This function runs in background to update attendance
         def refresh_attendance_only():
             try:
-                from srm_scrapper import SRMScraper
-                scraper = SRMScraper(email, None)
+                # Setup scraper without password (using stored cookies)
+                scraper = SRMScraper(email, None)  # No password needed
                 driver = scraper.setup_driver()
                 
-                # Apply stored cookies and get data
+                # 4. Use your stored cookies to login
                 driver.get("https://academia.srmist.edu.in")
                 for cookie in cookies:
                     driver.add_cookie(cookie)
                 
-                # Only fetches attendance page (faster)
+                # 5. ONLY get attendance page
                 html_source = scraper.get_attendance_page()
                 if html_source:
-                    # Updates both attendance and marks (same page)
+                    # 6. Update both attendance and marks (they're on same page)
                     attendance_success = scraper.parse_and_save_attendance(html_source, driver)
                     marks_success = scraper.parse_and_save_marks(html_source, driver)
-                    
-                    print(f"✅ Data refresh completed - Attendance: {attendance_success}, Marks: {marks_success}")
-                else:
-                    print("❌ Failed to load attendance page")
+                    print(f"✅ Quick refresh completed!")
                 
                 driver.quit()
                 
             except Exception as e:
                 print(f"❌ Refresh error: {str(e)}")
-                traceback.print_exc()
         
-        # Start refresh in background
-        threading.Thread(
-            target=refresh_attendance_only,
-            daemon=True
-        ).start()
+        # 7. Start the refresh in background
+        threading.Thread(target=refresh_attendance_only, daemon=True).start()
         
-        return jsonify({
-            'success': True,
-            'message': 'Attendance refresh started',
-            'lastUpdate': datetime.now().isoformat()
-        })
+        return jsonify({'success': True, 'message': 'Refresh started'})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -521,5 +483,44 @@ def get_refresh_status():
             'marks_last_update': marks_data.data[0]['updated_at'] if marks_data.data else None
         })
         
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/quick-login', methods=['POST'])
+def quick_login():
+    """Login with email only if valid token exists in database"""
+    try:
+        data = request.json
+        email = data.get('email')
+        
+        # Check if valid token exists in database
+        stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
+        
+        if not stored_data.data:
+            return jsonify({
+                'success': False,
+                'message': 'No existing session found, please login with password'
+            }), 404
+            
+        stored_token = stored_data.data[0].get('token')
+        
+        try:
+            # Verify the stored token is still valid
+            verify_token(stored_token)
+            
+            # Token valid, return it for new device
+            return jsonify({
+                'success': True,
+                'token': stored_token,
+                'user': {'email': email},
+                'hasData': True  # Data already exists in database
+            })
+            
+        except:
+            return jsonify({
+                'success': False,
+                'message': 'Stored session expired, please login with password'
+            }), 401
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500 
