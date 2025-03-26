@@ -408,3 +408,118 @@ def verify_cookies():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/verify-session', methods=['GET'])
+def verify_session():
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No token provided'}), 401
+            
+        token = auth_header.split(' ')[1]
+        email = verify_token(token)
+        
+        if not email:
+            return jsonify({'error': 'Invalid token'}), 401
+            
+        # Get cookies from Supabase
+        cookies = verify_and_get_cookies(email)
+        if not cookies:
+            return jsonify({'error': 'No session found'}), 401
+            
+        return jsonify({
+            'status': 'success',
+            'email': email,
+            'cookieCount': len(cookies)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/refresh-data', methods=['POST'])
+def refresh_data():
+    """Refresh only attendance and marks data using stored cookies"""
+    try:
+        # Verify user's token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No token provided'}), 401
+            
+        token = auth_header.split(' ')[1]
+        email = verify_token(token)
+        
+        # Get stored cookies from Supabase
+        stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
+        if not stored_data.data:
+            return jsonify({'error': 'No stored session found'}), 404
+            
+        cookies = stored_data.data[0].get('cookies', {})
+        
+        # Start only attendance scraper in background
+        def refresh_attendance_only():
+            try:
+                from srm_scrapper import SRMScraper
+                scraper = SRMScraper(email, None)
+                driver = scraper.setup_driver()
+                
+                # Apply stored cookies and get data
+                driver.get("https://academia.srmist.edu.in")
+                for cookie in cookies:
+                    driver.add_cookie(cookie)
+                
+                # Only fetches attendance page (faster)
+                html_source = scraper.get_attendance_page()
+                if html_source:
+                    # Updates both attendance and marks (same page)
+                    attendance_success = scraper.parse_and_save_attendance(html_source, driver)
+                    marks_success = scraper.parse_and_save_marks(html_source, driver)
+                    
+                    print(f"✅ Data refresh completed - Attendance: {attendance_success}, Marks: {marks_success}")
+                else:
+                    print("❌ Failed to load attendance page")
+                
+                driver.quit()
+                
+            except Exception as e:
+                print(f"❌ Refresh error: {str(e)}")
+                traceback.print_exc()
+        
+        # Start refresh in background
+        threading.Thread(
+            target=refresh_attendance_only,
+            daemon=True
+        ).start()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Attendance refresh started',
+            'lastUpdate': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Add endpoint to check refresh status
+@app.route('/api/refresh-status', methods=['GET'])
+def get_refresh_status():
+    """Check when attendance was last updated"""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No token provided'}), 401
+            
+        token = auth_header.split(' ')[1]
+        email = verify_token(token)
+        
+        # Get last update times from both tables
+        attendance_data = supabase.table('attendance').select('updated_at').eq('user_id', email).execute()
+        marks_data = supabase.table('marks').select('updated_at').eq('user_id', email).execute()
+        
+        return jsonify({
+            'success': True,
+            'attendance_last_update': attendance_data.data[0]['updated_at'] if attendance_data.data else None,
+            'marks_last_update': marks_data.data[0]['updated_at'] if marks_data.data else None
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 

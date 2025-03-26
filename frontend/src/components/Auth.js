@@ -188,7 +188,7 @@ const Auth = () => {
       chars.forEach((_, index) => {
         setTimeout(() => {
           setRevealedChars(prev => [...prev, index])
-        }, index * 200) // 0.2 second delay between each character
+        }, index * 50) // Changed from 200ms to 50ms (0.05 seconds)
       })
     } else {
       // When hiding password, reset immediately
@@ -265,7 +265,14 @@ const Auth = () => {
                 </svg>
               </button>
               {showPassword && (
-                <div style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', padding: '15px 18px' }}>
+                <div style={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  pointerEvents: 'none', 
+                  padding: '15px 18px',
+                  background: 'transparent' 
+                }}>
                   {password.split('').map((char, index) => (
                     <span
                       key={index}

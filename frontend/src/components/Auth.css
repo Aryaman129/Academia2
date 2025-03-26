@@ -425,16 +425,29 @@
 .password-reveal {
   display: inline-block;
   opacity: 0;
-  animation: revealText 0.2s ease forwards;
+  animation: revealText 0.05s ease forwards;
+  background: transparent;
 }
 
 @keyframes revealText {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(5px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Ensure password input maintains dark background when type changes */
+.form-group input[type="text"],
+.form-group input[type="password"] {
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffffff;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="password"]:focus {
+  background: rgba(0, 0, 0, 0.8);
 } 
