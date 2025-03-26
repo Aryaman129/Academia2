@@ -49,10 +49,14 @@ def get_srm_cookies(username, password):
         json.dump(cookies, file)
 
     print("✅ Cookies saved successfully!")
-    driver.quit()
+    driver.quit() 
+
+Email = input("Enter your email: ")
+Password = input("Enter your password: ")
+
 
 # Run the function
-get_srm_cookies("am5965@srmist.edu.in", "Galactic@1296")
+get_srm_cookies(Email, Password)
 
 
 

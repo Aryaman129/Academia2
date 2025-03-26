@@ -47,32 +47,37 @@ def verify_token(token):
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """Login endpoint that triggers scraper and handles token"""
     data = request.json
     email = data.get('email')
     password = data.get('password')
 
     try:
-        print(f"🔄 Starting login process for {email}")
+        print(f"Starting login for {email}")
         
-        # Import and use SRMScraper for login
         from srm_scrapper import SRMScraper
         scraper = SRMScraper(email, password)
         
-        # Get cookies using the scraper's login
+        # Get cookies using srm_login.py's exact code
         login_result = scraper.login_and_get_cookies()
         
         if not login_result['success']:
+            print(f"❌ Login failed: {login_result['message']}")
             return jsonify({'error': login_result['message']}), 401
             
         cookies = login_result['cookies']
-        print(f"🍪 Received cookies: {list(cookies.keys())}")
+        print(f"✅ Extracted cookies: {list(cookies.keys())}")
         
         # Create JWT token
         token = create_jwt_token(email)
         
         # Store in Supabase
         try:
+            # First verify we have cookies
+            if not cookies:
+                raise Exception("No cookies extracted")
+                
+            print(f"Storing {len(cookies)} cookies in Supabase...")
+            
             cookie_data = {
                 'email': email,
                 'cookies': cookies,
@@ -80,17 +85,19 @@ def login():
                 'updated_at': datetime.now().isoformat()
             }
             
-            # First, delete any existing record
+            # Delete old record
             supabase.table('user_cookies').delete().eq('email', email).execute()
-            print("✅ Deleted old cookie record if any")
             
-            # Then insert new record
+            # Insert new record
             result = supabase.table('user_cookies').insert(cookie_data).execute()
-            print(f"✅ Supabase storage result: {result}")
+            
+            # Verify storage
+            verify = supabase.table('user_cookies').select('*').eq('email', email).execute()
+            if verify.data:
+                print(f"✅ Verified cookie storage - found {len(verify.data[0]['cookies'])} cookies")
             
         except Exception as e:
             print(f"❌ Supabase storage error: {str(e)}")
-            traceback.print_exc()
             return jsonify({'error': f'Failed to store cookies: {str(e)}'}), 500
         
         # Start scrapers in background
@@ -108,8 +115,7 @@ def login():
         })
         
     except Exception as e:
-        print(f"❌ Login process error: {str(e)}")
-        traceback.print_exc()
+        print(f"❌ Login error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Add user endpoint to verify token

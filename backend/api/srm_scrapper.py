@@ -1,119 +1,63 @@
+import json
+
 def login_and_get_cookies(self):
-    """Login and return cookies without starting scrapers"""
+    """Login and return cookies using exact same code as srm_login.py"""
     try:
         self.driver = self.setup_driver()
-        if not self.driver:
-            return {
-                'success': False,
-                'message': 'Failed to initialize Chrome driver'
-            }
-            
-        try:
-            self.driver.get(LOGIN_URL)
-            wait = WebDriverWait(self.driver, 30)
-            
-            # Switch to iframe with retry
-            for attempt in range(3):
-                try:
-                    wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
-                    logger.info("Switched to login iframe")
-                    break
-                except Exception as e:
-                    logger.warning(f"⚠️ Attempt {attempt+1} to switch to iframe failed: {e}")
-                    if attempt == 2:  # Last attempt failed
-                        raise
-                    time.sleep(2)
-                
-            # Enter email with retry
-            for attempt in range(3):
-                try:
-                    email_field = wait.until(EC.presence_of_element_located((By.ID, "login_id")))
-                    email_field.clear()  # Clear first
-                    time.sleep(0.5)
-                    email_field.send_keys(self.email)
-                    logger.info(f"Entered email: {self.email}")
-                    break
-                except Exception as e:
-                    logger.warning(f"⚠️ Attempt {attempt+1} to enter email failed: {e}")
-                    if attempt == 2:  # Last attempt failed
-                        raise
-                    time.sleep(2)
+        self.driver.get(LOGIN_URL)
 
-            # Click Next button with retry
-            for attempt in range(3):
-                try:
-                    next_btn = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
-                    self.driver.execute_script("arguments[0].click();", next_btn)
-                    logger.info("Clicked Next")
-                    break
-                except Exception as e:
-                    logger.warning(f"⚠️ Attempt {attempt+1} to click Next failed: {e}")
-                    if attempt == 2:  # Last attempt failed
-                        raise
-                    time.sleep(2)
+        wait = WebDriverWait(self.driver, 30)  # Wait up to 30 seconds
 
-            time.sleep(2)
-            
-            # Enter password with retry
-            for attempt in range(3):
-                try:
-                    password_field = wait.until(EC.element_to_be_clickable((By.ID, "password")))
-                    password_field.clear()
-                    time.sleep(0.5)
-                    password_field.send_keys(self.password)
-                    logger.info("Entered password")
-                    break
-                except Exception as e:
-                    logger.warning(f"⚠️ Attempt {attempt+1} to enter password failed: {e}")
-                    if attempt == 2:
-                        raise
-                    time.sleep(2)
+        # ✅ Switch to the iframe before interacting with elements
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
+        print("✅ Switched to iframe")
 
-            # Click Sign In button with retry
-            for attempt in range(3):
-                try:
-                    sign_in_btn = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
-                    self.driver.execute_script("arguments[0].click();", sign_in_btn)
-                    logger.info("Clicked Sign In")
-                    break
-                except Exception as e:
-                    logger.warning(f"⚠️ Attempt {attempt+1} to click Sign In failed: {e}")
-                    if attempt == 2:
-                        raise
-                    time.sleep(2)
+        # ✅ Find and fill the email field
+        email_field = wait.until(EC.presence_of_element_located((By.ID, "login_id")))
+        email_field.send_keys(self.email)
+        print("✅ Entered email")
 
-            time.sleep(5)
-            
-            # Extract cookies
-            all_cookies = self.driver.get_cookies()
-            cookies = {cookie['name']: cookie['value'] for cookie in all_cookies}
-            
-            if not cookies:
-                return {
-                    'success': False,
-                    'message': 'No cookies captured after login'
-                }
-                
-            logger.info(f"Successfully captured {len(cookies)} cookies")
-            
-            return {
-                'success': True,
-                'cookies': cookies
-            }
-            
-        except Exception as e:
-            logger.error(f"Login error: {str(e)}")
-            return {
-                'success': False,
-                'message': str(e)
-            }
-        finally:
-            if self.driver:
-                self.driver.quit()
-                logger.info("Chrome driver closed")
-                
+        # ✅ Click "Next" Button
+        next_button = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
+        next_button.click()
+        print("✅ Clicked Next")
+
+        # ✅ Wait for the password field to become interactable
+        time.sleep(2)  # Small delay to allow transition
+
+        password_field = wait.until(EC.element_to_be_clickable((By.ID, "password")))
+        password_field.send_keys(self.password)
+        print("✅ Entered password")
+
+        # ✅ Click "Sign In" Button
+        sign_in_button = wait.until(EC.element_to_be_clickable((By.ID, "nextbtn")))
+        sign_in_button.click()
+        print("✅ Clicked Sign In")
+
+        time.sleep(5)  # Wait for login to complete
+
+        # ✅ Extract session cookies - EXACT SAME CODE AS srm_login.py
+        cookies = {cookie['name']: cookie['value'] for cookie in self.driver.get_cookies()}
+
+        # ✅ Save cookies to a file (for debugging)
+        with open("srm_cookies.json", "w") as file:
+            json.dump(cookies, file)
+
+        print("✅ Cookies saved successfully!")
+        
+        # Close the driver
+        self.driver.quit()
+
+        # Return the cookies
+        return {
+            'success': True,
+            'cookies': cookies
+        }
+
     except Exception as e:
-        logger.error(f"Critical error: {str(e)}")
+        print(f"❌ Error during login: {str(e)}")
+        if self.driver:
+            self.driver.quit()
         return {
             'success': False,
             'message': str(e)
