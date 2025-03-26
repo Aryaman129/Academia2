@@ -228,7 +228,7 @@ const Auth = () => {
       
       <div className="login-card-container">
         <div className="login-card">
-          <h1>Academia Student Portal</h1>
+          <h1>Acadia Student Portal</h1>
           <p>(Testing Version)</p>
 
           <form className="login-form" onSubmit={handleLogin}>
