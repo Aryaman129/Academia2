@@ -7,6 +7,11 @@ import time
 import threading
 from supabase import create_client, Client
 import traceback
+import json
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -42,90 +47,68 @@ def verify_token(token):
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """Login endpoint that stores cookies and token"""
+    """Login endpoint that triggers scraper and handles token"""
     data = request.json
     email = data.get('email')
     password = data.get('password')
 
     try:
-        # Create a separate driver instance just for getting cookies
-        cookie_driver = setup_driver()
+        print(f"🔄 Starting login process for {email}")
+        
+        # Import and use SRMScraper for login
+        from srm_scrapper import SRMScraper
+        scraper = SRMScraper(email, password)
+        
+        # Get cookies using the scraper's login
+        login_result = scraper.login_and_get_cookies()
+        
+        if not login_result['success']:
+            return jsonify({'error': login_result['message']}), 401
+            
+        cookies = login_result['cookies']
+        print(f"🍪 Received cookies: {list(cookies.keys())}")
+        
+        # Create JWT token
+        token = create_jwt_token(email)
+        
+        # Store in Supabase
         try:
-            print(f"🔄 Starting login process for {email}")
-            from scrape_attendance import login as attendance_login
-            
-            # Set global variables needed by login function
-            import scrape_attendance
-            scrape_attendance.username = email
-            scrape_attendance.password = password
-            
-            # Call the login function
-            login_success = attendance_login(cookie_driver)
-            
-            if not login_success:
-                print("❌ Login failed in attendance_login")
-                return jsonify({'error': 'Login failed'}), 401
-                
-            # Extract cookies after successful login
-            all_cookies = cookie_driver.get_cookies()
-            print(f"📝 Raw cookies received: {all_cookies}")
-            
-            cookies = {cookie['name']: cookie['value'] for cookie in all_cookies}
-            print(f"🍪 Processed {len(cookies)} cookies: {list(cookies.keys())}")
-            
-            if not cookies:
-                print("⚠️ No cookies were captured!")
-                return jsonify({'error': 'No cookies captured'}), 500
-            
-            # Create JWT token
-            token = create_jwt_token(email)
-            print(f"🎟️ Created JWT token: {token[:10]}...")
-            
-            # Store in Supabase with explicit data typing
-            try:
-                cookie_data = {
-                    'email': email,
-                    'cookies': cookies,  # Make sure this is a dict
-                    'token': token,
-                    'updated_at': datetime.now().isoformat()
-                }
-                print(f"📦 Attempting to store data: {cookie_data}")
-                
-                result = supabase.table('user_cookies').upsert(cookie_data).execute()
-                print(f"✅ Supabase storage successful: {result}")
-                
-                # Verify storage
-                verify = supabase.table('user_cookies').select('*').eq('email', email).execute()
-                if verify.data:
-                    print(f"✅ Verified storage - found {len(verify.data)} records")
-                else:
-                    print("⚠️ Storage verification failed - no records found")
-                
-            except Exception as e:
-                print(f"❌ Supabase storage error: {str(e)}")
-                traceback.print_exc()
-                return jsonify({'error': f'Failed to store cookies: {str(e)}'}), 500
-            
-            # Start scrapers in background
-            start_scrapers(email, password)
-                
-            return jsonify({
-                'success': True,
+            cookie_data = {
+                'email': email,
+                'cookies': cookies,
                 'token': token,
-                'user': {'email': email},
-                'cookieCount': len(cookies)
-            })
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # First, delete any existing record
+            supabase.table('user_cookies').delete().eq('email', email).execute()
+            print("✅ Deleted old cookie record if any")
+            
+            # Then insert new record
+            result = supabase.table('user_cookies').insert(cookie_data).execute()
+            print(f"✅ Supabase storage result: {result}")
             
         except Exception as e:
-            print(f"❌ Login process error: {str(e)}")
+            print(f"❌ Supabase storage error: {str(e)}")
             traceback.print_exc()
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cookie_driver.quit()
-            print("🔄 Cookie driver closed")
-            
+            return jsonify({'error': f'Failed to store cookies: {str(e)}'}), 500
+        
+        # Start scrapers in background
+        threading.Thread(
+            target=start_scrapers,
+            args=(email, password),
+            daemon=True
+        ).start()
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'user': {'email': email},
+            'cookieCount': len(cookies)
+        })
+        
     except Exception as e:
-        print(f"❌ Critical error: {str(e)}")
+        print(f"❌ Login process error: {str(e)}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
