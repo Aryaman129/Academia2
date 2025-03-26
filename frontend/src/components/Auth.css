@@ -110,7 +110,7 @@
 .form-group input {
   width: 100%;
   padding: 15px 18px;
-  background: rgba(30, 30, 40, 0.7);
+  background: rgba(0, 0, 0, 0.7);
   border: 1px solid rgba(70, 70, 90, 0.3);
   border-radius: 12px;
   color: #ffffff;
@@ -120,7 +120,7 @@
 }
 
 .form-group input:focus {
-  background: rgba(40, 40, 55, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   border-color: #4d4dff;
   outline: none;
   box-shadow: 0 0 0 3px rgba(77, 77, 255, 0.2), inset 0 2px 5px rgba(0, 0, 0, 0.2);
@@ -419,4 +419,22 @@
 .form-group input[type="password"],
 .form-group input[type="text"] {
   padding-right: 45px;
+}
+
+/* Password reveal animation */
+.password-reveal {
+  display: inline-block;
+  opacity: 0;
+  animation: revealText 0.2s ease forwards;
+}
+
+@keyframes revealText {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 } 

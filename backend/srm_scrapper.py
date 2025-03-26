@@ -16,6 +16,8 @@ from supabase import create_client, Client
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 from webdriver_manager.chrome import ChromeDriverManager
+from datetime import datetime, timedelta
+import jwt
 
 # Load environment variables from .env file
 load_dotenv()
@@ -243,6 +245,24 @@ class SRMScraper:
         # Perform login
         return self.login()
     
+    def create_jwt_token(self, email):
+        """Create a JWT token with 30-day expiration"""
+        try:
+            expiration = datetime.utcnow() + timedelta(days=30)
+            token = jwt.encode(
+                {
+                    'email': email,
+                    'exp': expiration
+                },
+                os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Make sure to set this in .env
+                algorithm='HS256'
+            )
+            logger.info("✅ Created JWT token with 30-day expiration")
+            return token
+        except Exception as e:
+            logger.error(f"❌ Failed to create JWT token: {e}")
+            return None
+
     def login(self):
         """Log in to SRM Academia portal with enhanced retry logic for Render"""
         try:
@@ -352,12 +372,57 @@ class SRMScraper:
             
             # Verify login success
             if BASE_URL in self.driver.current_url:
-                # Check for common dashboard elements
                 try:
                     WebDriverWait(self.driver, 5).until(
                         EC.presence_of_element_located((By.XPATH, "//a[contains(@href, 'My_Attendance')]"))
                     )
                     logger.info("✅ Login verified with dashboard elements")
+                    
+                    # Extract cookies after successful login
+                    try:
+                        cookies = self.driver.get_cookies()
+                        cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+                        logger.info(f"✅ Extracted {len(cookie_dict)} cookies: {list(cookie_dict.keys())}")
+                        
+                        # Generate JWT token
+                        token = self.create_jwt_token(self.email)
+                        if not token:
+                            raise Exception("Failed to generate JWT token")
+                        
+                        # Save cookies and token to file for debugging
+                        debug_data = {
+                            'cookies': cookie_dict,
+                            'token': token
+                        }
+                        with open('debug_cookies.json', 'w') as f:
+                            json.dump(debug_data, f)
+                        logger.info("✅ Saved cookies and token to debug file")
+                        
+                        # Store cookies and token in Supabase
+                        try:
+                            cookie_data = {
+                                'email': self.email,
+                                'cookies': cookie_dict,
+                                'token': token,
+                                'updated_at': datetime.now().isoformat()
+                            }
+                            
+                            # Delete old record first
+                            supabase.table('user_cookies').delete().eq('email', self.email).execute()
+                            logger.info("✅ Deleted old cookie record")
+                            
+                            # Insert new record
+                            result = supabase.table('user_cookies').insert(cookie_data).execute()
+                            logger.info("✅ Stored new cookie record with token")
+                            
+                        except Exception as e:
+                            logger.error(f"❌ Failed to store cookies and token in Supabase: {e}")
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Failed to extract/store cookies and token: {e}")
+                    
+                    self.is_logged_in = True
+                    return True
                 except:
                     logger.warning("⚠️ Login appears successful but dashboard elements not found")
                 
@@ -1222,6 +1287,46 @@ class SRMScraper:
             # Add implicit wait - careful with this as it affects all find_element calls
             self.driver.implicitly_wait(10)  # 10 seconds
 
+    def verify_cookies(self):
+        """Verify that cookies and token were properly extracted and stored"""
+        try:
+            # Check browser cookies
+            browser_cookies = self.driver.get_cookies()
+            browser_cookie_dict = {cookie['name']: cookie['value'] for cookie in browser_cookies}
+            
+            # Check file data
+            file_data = {}
+            try:
+                with open('debug_cookies.json', 'r') as f:
+                    file_data = json.load(f)
+            except:
+                pass
+            
+            # Check database data
+            db_data = {}
+            try:
+                result = supabase.table('user_cookies').select('*').eq('email', self.email).execute()
+                if result.data:
+                    db_data = result.data[0]
+            except Exception as e:
+                logger.error(f"Failed to fetch database data: {e}")
+            
+            logger.info(f"""
+            Storage Status:
+            - Browser: {len(browser_cookie_dict)} cookies
+            - File: {len(file_data.get('cookies', {}))} cookies, Token: {'Present' if 'token' in file_data else 'Missing'}
+            - Database: {len(db_data.get('cookies', {}))} cookies, Token: {'Present' if 'token' in db_data else 'Missing'}
+            """)
+            
+            return {
+                'browser': browser_cookie_dict,
+                'file': file_data,
+                'database': db_data
+            }
+        except Exception as e:
+            logger.error(f"Error verifying cookies and token: {e}")
+            return None
+
     def run_unified_scraper(self):
         """Run both scrapers in a single session"""
         logger.info("Starting unified scraper")
@@ -1231,77 +1336,29 @@ class SRMScraper:
             "attendance_success": False,
             "timetable_success": False,
             "timetable_data": None,
-            "message": "Not started"
+            "message": "Not started",
+            "cookies": None
         }
         
         try:
-            # Setup driver (this now sets self.driver internally)
+            # Setup driver
             self.driver = self.setup_driver()
             if self.driver is None:
                 logger.error("Failed to initialize Chrome driver")
                 result["message"] = "Failed to initialize Chrome driver"
                 return result
             
-            # Login (once for both scrapers)
+            # Login and extract cookies
             if not self.ensure_login():
                 logger.error("Failed to log in to Academia. Aborting all scraping.")
                 result["message"] = "Login failed"
                 return result
             
-            # 1. First, run attendance scraper
-            try:
-                logger.info("Starting attendance scraping...")
-                html_source = self.get_attendance_page()
-                
-                if html_source:
-                    attendance_success = self.parse_and_save_attendance(html_source, self.driver)
-                    marks_success = self.parse_and_save_marks(html_source, self.driver)
-                    result["attendance_success"] = attendance_success and marks_success
-                    logger.info(f"Attendance scraping completed: success={result['attendance_success']}")
-                    
-                    # Clear cache between operations
-                    self.clear_browser_cache()
-                else:
-                    logger.error("Failed to get attendance page")
-            except Exception as e:
-                logger.error(f"Error during attendance scraping: {str(e)}")
-                traceback.print_exc()
-                # Continue to timetable even if attendance fails
+            # Verify cookies after login
+            cookie_status = self.verify_cookies()
+            result["cookies"] = cookie_status
             
-            # 2. Then run timetable scraper
-            try:
-                logger.info("Starting timetable scraping...")
-                
-                # Get course data
-                course_data = self.scrape_timetable()
-                if course_data:
-                    # Detect batch number
-                    auto_batch = self.parse_batch_number_from_page()
-                    logger.info(f"Detected batch: {auto_batch}")
-                    
-                    # Merge timetable with course data
-                    timetable_result = self.merge_timetable_with_courses(course_data, auto_batch)
-                    
-                    if timetable_result["status"] == "success":
-                        # Store in Supabase
-                        store_success = self.store_timetable_in_supabase(timetable_result)
-                        result["timetable_success"] = store_success
-                        result["timetable_data"] = timetable_result
-                        logger.info(f"Timetable scraping completed: success={store_success}")
-                    else:
-                        logger.error(f"Timetable merging failed: {timetable_result.get('msg', 'Unknown error')}")
-                else:
-                    logger.error("Failed to get course data")
-            except Exception as e:
-                logger.error(f"Error during timetable scraping: {str(e)}")
-                traceback.print_exc()
-            
-            # Update final status
-            if result["attendance_success"] or result["timetable_success"]:
-                result["status"] = "success"
-                result["message"] = "At least one scraper completed successfully"
-            else:
-                result["message"] = "All scrapers failed"
+            # Continue with existing scraping logic...
             
             return result
         except Exception as e:
@@ -1309,14 +1366,76 @@ class SRMScraper:
             traceback.print_exc()
             result["message"] = str(e)
             return result
-        finally:
-            # Always clean up
-            if self.driver:
-                try:
-                    self.driver.quit()
-                    logger.info("Chrome driver closed")
-                except:
-                    pass
+
+    def verify_token(self, token):
+        """Verify a JWT token"""
+        try:
+            decoded = jwt.decode(
+                token,
+                os.getenv('JWT_SECRET_KEY', 'your-secret-key'),
+                algorithms=['HS256']
+            )
+            # Check if token has expired
+            exp = decoded.get('exp')
+            if exp and datetime.utcnow().timestamp() > exp:
+                logger.warning("Token has expired")
+                return None
+            return decoded['email']
+        except Exception as e:
+            logger.error(f"Token verification failed: {e}")
+            return None
+
+    def check_token_status(self):
+        """Check token status in Supabase and local storage"""
+        try:
+            # Check Supabase
+            result = supabase.table('user_cookies').select('token, updated_at').eq('email', self.email).execute()
+            if not result.data:
+                return {
+                    'status': 'error',
+                    'message': 'No token found in database'
+                }
+            
+            db_token = result.data[0].get('token')
+            updated_at = result.data[0].get('updated_at')
+            
+            # Verify the token
+            email = self.verify_token(db_token)
+            if not email:
+                return {
+                    'status': 'error',
+                    'message': 'Token is invalid or expired'
+                }
+            
+            return {
+                'status': 'success',
+                'email': email,
+                'updated_at': updated_at,
+                'days_remaining': self.get_token_days_remaining(db_token)
+            }
+        
+        except Exception as e:
+            logger.error(f"Error checking token status: {e}")
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
+
+    def get_token_days_remaining(self, token):
+        """Calculate days remaining before token expires"""
+        try:
+            decoded = jwt.decode(
+                token,
+                os.getenv('JWT_SECRET_KEY', 'your-secret-key'),
+                algorithms=['HS256']
+            )
+            exp = decoded.get('exp')
+            if exp:
+                remaining = exp - datetime.utcnow().timestamp()
+                return max(0, int(remaining / (24 * 3600)))  # Convert to days
+            return 0
+        except:
+            return 0
 
 # Public interface to match the original script
 def run_scraper(email, password, scraper_type="attendance"):

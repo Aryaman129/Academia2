@@ -33,6 +33,7 @@ const Auth = () => {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [revealedChars, setRevealedChars] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -177,6 +178,25 @@ const Auth = () => {
     }
   }
 
+  // Add reveal animation function
+  const togglePasswordVisibility = () => {
+    if (!showPassword) {
+      // When showing password, reveal each character one by one
+      setShowPassword(true)
+      const chars = password.split('')
+      setRevealedChars([])
+      chars.forEach((_, index) => {
+        setTimeout(() => {
+          setRevealedChars(prev => [...prev, index])
+        }, index * 200) // 0.2 second delay between each character
+      })
+    } else {
+      // When hiding password, reset immediately
+      setShowPassword(false)
+      setRevealedChars([])
+    }
+  }
+
   return (
     <div className="login-container">
       <div className="login-background"></div>
@@ -223,7 +243,7 @@ const Auth = () => {
               <button
                 type="button"
                 className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={togglePasswordVisibility}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 <svg
@@ -244,6 +264,22 @@ const Auth = () => {
                   )}
                 </svg>
               </button>
+              {showPassword && (
+                <div style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', padding: '15px 18px' }}>
+                  {password.split('').map((char, index) => (
+                    <span
+                      key={index}
+                      className={revealedChars.includes(index) ? 'password-reveal' : ''}
+                      style={{ 
+                        visibility: revealedChars.includes(index) ? 'visible' : 'hidden',
+                        color: '#ffffff'
+                      }}
+                    >
+                      {char}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {error && <div className="error-message">{error}</div>}
