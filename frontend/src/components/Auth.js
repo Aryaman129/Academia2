@@ -186,13 +186,6 @@ const Auth = () => {
       <div className="box"></div>
       
       <div className="login-card-container">
-        <div className={`srm-logo ${logoVisible ? 'visible' : ''}`}>
-          <div className="academia-title">
-            <h2 className="text-3xl font-extrabold text-white">Academia</h2>
-            <div className="version-badge">(Testing Version)</div>
-          </div>
-        </div>
-
         <div className="login-card">
           <h1>Academia Student Portal</h1>
           <p>(Testing Version)</p>
