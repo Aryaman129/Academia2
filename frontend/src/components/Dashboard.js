@@ -129,7 +129,7 @@ const Dashboard = () => {
         const records = response.data.attendance.records || [];
         
         // Filter out header rows and empty records
-        // Use set to ensure uniqueness of course titles
+        // Use set to ensure uniqueness based on course title AND category
         const seen = new Set();
         const uniqueRecords = [];
         
@@ -137,13 +137,17 @@ const Dashboard = () => {
           // Skip invalid records and headers
           if (!record.course_title || 
               record.course_title.trim() === "Course Title" || 
-              !record.attendance_percentage) {
+              !record.attendance_percentage ||
+              !record.category) {
             continue;
           }
           
-          // Only add each course once - prevents duplicate entries from API
-          if (!seen.has(record.course_title)) {
-            seen.add(record.course_title);
+          // Create unique key combining course title and category
+          const uniqueKey = `${record.course_title}-${record.category}`;
+          
+          // Only add if this combination hasn't been seen before
+          if (!seen.has(uniqueKey)) {
+            seen.add(uniqueKey);
             uniqueRecords.push(record);
           }
         }
@@ -459,47 +463,33 @@ const Dashboard = () => {
             {attendanceData.map((record, index) => (
                 <div key={index} className="bg-[#1A1F26] rounded-lg p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="text-yellow-400 mt-1">✦</div>
-                      <div className="min-w-[300px]">
-                        <div className="font-medium">{record.course_title}</div>
-                        <div className="text-sm text-gray-400">
-                          {(() => {
-                            const totalClasses = record.hours_conducted;
-                            const presentClasses = record.hours_conducted - record.hours_absent;
-                            const currentPercentage = (presentClasses / totalClasses) * 100;
-                            
-                            if (currentPercentage < 75) {
-                              let requiredClasses = 0;
-                              let tempTotal = totalClasses;
-                              let tempPresent = presentClasses;
-                              
-                              while ((tempPresent / tempTotal) * 100 < 75) {
-                                tempPresent++;
-                                tempTotal++;
-                                requiredClasses++;
-                              }
-                              
-                              return `Required: ${requiredClasses} ${requiredClasses === 1 ? 'class' : 'classes'}`;
-                            } else {
-                              const minRequired = Math.ceil(totalClasses * 0.75);
-                              const margin = presentClasses - minRequired;
-                              
-                              return `Margin: ${margin} ${margin === 1 ? 'class' : 'classes'}`;
-                            }
-                          })()}
-                        </div>
+                    <div>
+                      <h3 className="text-lg font-medium">{record.course_title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-400">{record.course_code}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          record.category === 'Theory' 
+                            ? 'bg-blue-500/20 text-blue-400' 
+                            : 'bg-green-500/20 text-green-400'
+                        }`}>
+                          {record.category}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
                       <div className="flex items-center gap-2">
-                        <span className="text-green-400 text-sm">{record.hours_conducted - record.hours_absent}</span>
-                        <span className="text-red-400 text-sm">{record.hours_absent}</span>
-                        <span className="bg-gray-700 px-2 py-1 rounded text-xs">
+                        <span className="text-green-400 text-sm" title="Classes Attended">
+                          {record.hours_conducted - record.hours_absent}
+                        </span>
+                        <span className="text-gray-400">/</span>
+                        <span className="text-sm" title="Total Classes">
                           {record.hours_conducted}
                         </span>
+                        <span className="text-red-400 text-xs ml-2" title="Classes Missed">
+                          ({record.hours_absent} missed)
+                        </span>
                       </div>
-                      <div className={`text-sm font-medium w-16 text-right ${
+                      <div className={`text-sm font-medium w-20 text-right ${
                         parseFloat(record.attendance_percentage) >= 75 
                           ? "text-green-400" 
                           : parseFloat(record.attendance_percentage) >= 65
@@ -507,6 +497,11 @@ const Dashboard = () => {
                             : "text-red-400"
                       }`}>
                         {record.attendance_percentage}%
+                        {parseFloat(record.attendance_percentage) < 75 && (
+                          <div className="text-xs text-red-400 font-normal">
+                            Need {Math.ceil((75 * record.hours_conducted - (record.hours_conducted - record.hours_absent) * 100) / 25)} more
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

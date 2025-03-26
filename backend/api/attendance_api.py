@@ -52,68 +52,69 @@ def login():
     password = data.get('password')
 
     try:
-        print(f"Starting login for {email}")
+        print(f"🔄 Starting login process for {email}")
         
-        from srm_scrapper import SRMScraper
-        scraper = SRMScraper(email, password)
+        # First get cookies
+        from srm_login import get_srm_cookies  # Import the exact function
         
-        # Get cookies using srm_login.py's exact code
-        login_result = scraper.login_and_get_cookies()
-        
-        if not login_result['success']:
-            print(f"❌ Login failed: {login_result['message']}")
-            return jsonify({'error': login_result['message']}), 401
-            
-        cookies = login_result['cookies']
-        print(f"✅ Extracted cookies: {list(cookies.keys())}")
-        
-        # Create JWT token
-        token = create_jwt_token(email)
-        
-        # Store in Supabase
         try:
-            # First verify we have cookies
-            if not cookies:
-                raise Exception("No cookies extracted")
+            # Get cookies first using the proven function
+            print("📝 Getting cookies using srm_login.py...")
+            cookies = get_srm_cookies(email, password)
+            print(f"🍪 Extracted cookies: {list(cookies.keys())}")
+            
+            # Create JWT token
+            token = create_jwt_token(email)
+            
+            # Store in Supabase
+            try:
+                cookie_data = {
+                    'email': email,
+                    'cookies': cookies,
+                    'token': token,
+                    'updated_at': datetime.now().isoformat()
+                }
                 
-            print(f"Storing {len(cookies)} cookies in Supabase...")
+                print(f"💾 Storing cookies in Supabase: {list(cookies.keys())}")
+                
+                # Delete old record
+                supabase.table('user_cookies').delete().eq('email', email).execute()
+                print("✅ Deleted old cookie record")
+                
+                # Insert new record
+                result = supabase.table('user_cookies').insert(cookie_data).execute()
+                print(f"✅ Stored new cookie record")
+                
+                # Verify storage
+                verify = supabase.table('user_cookies').select('*').eq('email', email).execute()
+                if verify.data:
+                    print(f"✅ Verified cookie storage - found {len(verify.data[0]['cookies'])} cookies")
+                else:
+                    print("⚠️ Could not verify cookie storage")
+                
+            except Exception as e:
+                print(f"❌ Supabase storage error: {str(e)}")
+                return jsonify({'error': f'Failed to store cookies: {str(e)}'}), 500
             
-            cookie_data = {
-                'email': email,
-                'cookies': cookies,
+            # Now start the scrapers in background
+            print("🔄 Starting scrapers in background...")
+            threading.Thread(
+                target=start_scrapers,
+                args=(email, password),
+                daemon=True
+            ).start()
+            
+            return jsonify({
+                'success': True,
                 'token': token,
-                'updated_at': datetime.now().isoformat()
-            }
-            
-            # Delete old record
-            supabase.table('user_cookies').delete().eq('email', email).execute()
-            
-            # Insert new record
-            result = supabase.table('user_cookies').insert(cookie_data).execute()
-            
-            # Verify storage
-            verify = supabase.table('user_cookies').select('*').eq('email', email).execute()
-            if verify.data:
-                print(f"✅ Verified cookie storage - found {len(verify.data[0]['cookies'])} cookies")
+                'user': {'email': email},
+                'cookieCount': len(cookies)
+            })
             
         except Exception as e:
-            print(f"❌ Supabase storage error: {str(e)}")
-            return jsonify({'error': f'Failed to store cookies: {str(e)}'}), 500
-        
-        # Start scrapers in background
-        threading.Thread(
-            target=start_scrapers,
-            args=(email, password),
-            daemon=True
-        ).start()
-        
-        return jsonify({
-            'success': True,
-            'token': token,
-            'user': {'email': email},
-            'cookieCount': len(cookies)
-        })
-        
+            print(f"❌ Cookie extraction error: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+            
     except Exception as e:
         print(f"❌ Login error: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -306,6 +307,54 @@ def test_attendance():
                     })
         
         return jsonify(response)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/check-cookies', methods=['GET'])
+def check_cookies():
+    """Debug endpoint to check stored cookies"""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No token provided'}), 401
+            
+        token = auth_header.split(' ')[1]
+        email = verify_token(token)
+        
+        # Get cookies from Supabase
+        result = supabase.table('user_cookies').select('*').eq('email', email).execute()
+        
+        if not result.data:
+            return jsonify({
+                'success': False,
+                'message': 'No cookies found for user',
+                'email': email
+            })
+            
+        cookies = result.data[0].get('cookies', {})
+        
+        # Also check the debug file if it exists
+        file_cookies = {}
+        try:
+            with open('srm_cookies.json', 'r') as f:
+                file_cookies = json.load(f)
+        except:
+            pass
+            
+        return jsonify({
+            'success': True,
+            'email': email,
+            'database_cookies': {
+                'count': len(cookies),
+                'names': list(cookies.keys()),
+                'last_updated': result.data[0].get('updated_at')
+            },
+            'file_cookies': {
+                'count': len(file_cookies),
+                'names': list(file_cookies.keys()) if file_cookies else []
+            }
+        })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500 

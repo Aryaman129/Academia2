@@ -364,4 +364,59 @@
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* Password toggle button */
+.password-toggle {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 5px;
+  cursor: pointer;
+  color: rgba(200, 200, 220, 0.7);
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle:hover {
+  color: #4d4dff;
+}
+
+.password-toggle:focus {
+  outline: none;
+  color: #4d4dff;
+}
+
+/* Eye icon animations */
+.eye-icon {
+  transition: all 0.3s ease;
+}
+
+.eye-icon.eye-closed {
+  opacity: 0.7;
+}
+
+.eye-icon.eye-open {
+  opacity: 1;
+}
+
+.eye-icon line {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.eye-icon.eye-closed line {
+  stroke-dashoffset: 30;
+}
+
+/* Adjust password input padding for the toggle button */
+.form-group input[type="password"],
+.form-group input[type="text"] {
+  padding-right: 45px;
 } 

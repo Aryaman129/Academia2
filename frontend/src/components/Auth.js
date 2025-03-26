@@ -32,6 +32,7 @@ api.interceptors.response.use(
 const Auth = () => {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -210,7 +211,7 @@ const Auth = () => {
               <input
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 placeholder=" "
                 value={password}
@@ -219,6 +220,30 @@ const Auth = () => {
                 onBlur={() => setActiveInput(null)}
               />
               <label htmlFor="password">Password</label>
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <svg
+                  className={`eye-icon ${showPassword ? 'eye-open' : 'eye-closed'}`}
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                  {!showPassword && (
+                    <line x1="2" y1="2" x2="22" y2="22"></line>
+                  )}
+                </svg>
+              </button>
             </div>
 
             {error && <div className="error-message">{error}</div>}
