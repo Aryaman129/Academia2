@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import './Timetable.css';
 
 const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }) => {
@@ -9,17 +9,89 @@ const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }
     if (!timetableRef.current) return;
 
     try {
-      const canvas = await html2canvas(timetableRef.current, {
-        scale: 2, // Higher quality
-        backgroundColor: '#1a1a1a',
-        logging: true, // Enable logging for debugging
-        useCORS: true // Enable CORS for images
+      // Create a PDF document
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
       });
-
-      const link = document.createElement('a');
-      link.download = 'timetable.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      
+      // Define table dimensions
+      const margin = 15;
+      const cellWidth = (pdf.internal.pageSize.width - margin * 2) / (timeSlots.length + 1);
+      const cellHeight = 15;
+      const startX = margin;
+      const startY = margin;
+      
+      // Set title
+      pdf.setFontSize(18);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('Weekly Timetable', pdf.internal.pageSize.width / 2, startY - 5, { align: 'center' });
+      
+      // Draw header row
+      pdf.setFillColor(45, 55, 72);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10);
+      
+      // Empty top-left cell
+      pdf.rect(startX, startY, cellWidth, cellHeight, 'F');
+      
+      // Time slot header cells
+      timeSlots.forEach((time, index) => {
+        const x = startX + cellWidth * (index + 1);
+        pdf.rect(x, startY, cellWidth, cellHeight, 'F');
+        pdf.text(time, x + cellWidth / 2, startY + cellHeight / 2, { align: 'center', baseline: 'middle' });
+      });
+      
+      // Draw day rows
+      dayOrders.forEach((dayOrder, dayIndex) => {
+        const rowY = startY + cellHeight * (dayIndex + 1);
+        
+        // Day label cell
+        pdf.setFillColor(45, 55, 72);
+        pdf.setTextColor(255, 255, 255);
+        pdf.rect(startX, rowY, cellWidth, cellHeight, 'F');
+        pdf.text(getDayFromDayOrder(dayOrder), startX + cellWidth / 2, rowY + cellHeight / 2, { align: 'center', baseline: 'middle' });
+        
+        // Subject cells
+        timeSlots.forEach((timeSlot, timeIndex) => {
+          const x = startX + cellWidth * (timeIndex + 1);
+          const subject = getSubjectForCell(dayOrder, timeSlot);
+          
+          // Set appropriate fill color based on subject type
+          if (subject) {
+            if (subject.code === 'Event') {
+              pdf.setFillColor(41, 128, 185, 0.3); // Blue for events
+            } else if (subject.code === 'Custom') {
+              pdf.setFillColor(142, 68, 173, 0.3); // Purple for custom
+            } else if (subject.category?.toLowerCase() === 'practical') {
+              pdf.setFillColor(40, 167, 69, 0.15); // Green for practical
+            } else {
+              pdf.setFillColor(255, 193, 7, 0.15); // Yellow for theory
+            }
+          } else {
+            pdf.setFillColor(240, 240, 240); // Light gray for empty cells
+          }
+          
+          // Draw cell background
+          pdf.rect(x, rowY, cellWidth, cellHeight, 'F');
+          
+          // Draw cell content
+          if (subject) {
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(8);
+            pdf.text(subject.name || '', x + cellWidth / 2, rowY + cellHeight / 2 - 3, { align: 'center', baseline: 'middle' });
+            pdf.text(subject.code || '', x + cellWidth / 2, rowY + cellHeight / 2 + 3, { align: 'center', baseline: 'middle' });
+          }
+          
+          // Draw cell border
+          pdf.setDrawColor(0);
+          pdf.rect(x, rowY, cellWidth, cellHeight);
+        });
+      });
+      
+      // Save the PDF
+      pdf.save('timetable.pdf');
     } catch (err) {
       console.error('Failed to download timetable:', err);
       alert('Failed to download timetable. Please try again.');

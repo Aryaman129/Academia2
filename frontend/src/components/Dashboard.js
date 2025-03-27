@@ -6,7 +6,7 @@ import LoadingIndicator from "./LoadingIndicator"
 import './Dashboard.css';
 import AttendancePredictionModal from './AttendancePredictionModal';
 import { CALENDAR_DATA } from '../data/calendar';
-import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const API_URL = process.env.NODE_ENV === 'development' 
   ? process.env.REACT_APP_LOCAL_API_URL 
@@ -361,14 +361,12 @@ const Dashboard = () => {
     try {
       if (!timetableRef.current) return;
 
-      // Create a temporary div for the timetable grid
-      const tempDiv = document.createElement('div');
-      tempDiv.className = 'timetable-grid-download';
-      
-      // Create header row
-      const headerRow = document.createElement('div');
-      headerRow.className = 'grid-row header';
-      headerRow.innerHTML = `<div class="grid-cell time-header">Time</div>`;
+      // Create a PDF document
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
       
       // Format time slots to match backend format (HH:mm)
       const timeSlots = [
@@ -376,154 +374,96 @@ const Dashboard = () => {
         "11:35-12:25", "12:30-01:20", "01:25-02:15", "02:20-03:10",
         "03:10-04:00", "04:00-04:50"
       ];
-      console.log("Time Slots:", timeSlots);
       
-      timeSlots.forEach(slot => {
-        const cell = document.createElement('div');
-        cell.className = 'grid-cell';
+      // Define table dimensions
+      const margin = 10;
+      const cellWidth = (pdf.internal.pageSize.width - margin * 2) / (timeSlots.length + 1);
+      const cellHeight = 15;
+      const startX = margin;
+      const startY = margin;
+      
+      // Set title
+      pdf.setFontSize(18);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('Acadia Timetable', pdf.internal.pageSize.width / 2, startY - 5, { align: 'center' });
+      
+      // Draw header row
+      pdf.setFillColor(45, 55, 72);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10);
+      
+      // Time header cell
+      pdf.rect(startX, startY, cellWidth, cellHeight, 'F');
+      pdf.text('Time', startX + cellWidth / 2, startY + cellHeight / 2, { align: 'center', baseline: 'middle' });
+      
+      // Time slot header cells
+      timeSlots.forEach((slot, index) => {
+        const x = startX + cellWidth * (index + 1);
+        pdf.rect(x, startY, cellWidth, cellHeight, 'F');
         
         // Convert 24h format to 12h format for display
         const displayTime = slot.split('-').map(time => {
           const [hours, minutes] = time.split(':');
           const h = parseInt(hours);
           return `${h > 12 ? h - 12 : h}:${minutes}${h >= 12 ? 'PM' : 'AM'}`;
-        }).join(' - ');
+        }).join('-');
         
-        cell.textContent = displayTime;
-        headerRow.appendChild(cell);
+        pdf.text(displayTime, x + cellWidth / 2, startY + cellHeight / 2, { align: 'center', baseline: 'middle' });
       });
-      tempDiv.appendChild(headerRow);
       
-      // Create day rows
+      // Draw day rows
       for (let day = 1; day <= 5; day++) {
-        const row = document.createElement('div');
-        row.className = 'grid-row';
+        const rowY = startY + cellHeight * day;
         
-        // Add day label
-        const dayCell = document.createElement('div');
-        dayCell.className = 'grid-cell day-label';
-        dayCell.textContent = `Day ${day}`;
-        row.appendChild(dayCell);
+        // Day label cell
+        pdf.setFillColor(45, 55, 72);
+        pdf.setTextColor(255, 255, 255);
+        pdf.rect(startX, rowY, cellWidth, cellHeight, 'F');
+        pdf.text(`Day ${day}`, startX + cellWidth / 2, rowY + cellHeight / 2, { align: 'center', baseline: 'middle' });
         
-        // Add subject cells
-        timeSlots.forEach(timeSlot => {
-          const cell = document.createElement('div');
-          cell.className = 'grid-cell subject-cell';
+        // Subject cells
+        timeSlots.forEach((timeSlot, index) => {
+          const x = startX + cellWidth * (index + 1);
           
-          // Use merged timetable data
+          // Get subject data
           const dayData = timetableData[`Day ${day}`] || {};
           const slotData = dayData[timeSlot];
           
-          if (slotData?.courses?.length > 0) {
-            const course = slotData.courses[0];
-            cell.innerHTML = `
-              <div class="subject-title">${course.title || ''}</div>
-              <div class="subject-code">${course.code || ''}</div>
-              <div class="subject-room">${course.gcr_code || ''}</div>
-            `;
-            
-            // Add appropriate classes based on slot type
-            if (slotData.isManualEdit) {
-              cell.className += ' manual-edit';
-            } else if (course.code && course.code.startsWith('P')) {
-              cell.className += ' practical';
-            } else {
-              cell.className += ' theory';
-            }
+          // Set appropriate fill color based on slot type
+          if (slotData?.isManualEdit) {
+            pdf.setFillColor(30, 64, 175, 0.3); // Dark blue for manual edits
+          } else if (slotData?.courses?.[0]?.code?.startsWith('P')) {
+            pdf.setFillColor(40, 167, 69, 0.15); // Green for practical
+          } else if (slotData?.courses?.length > 0) {
+            pdf.setFillColor(255, 193, 7, 0.15); // Yellow for theory
           } else {
-            cell.textContent = 'No class scheduled';
-            cell.className += ' empty-slot';
+            pdf.setFillColor(30, 42, 30); // Dark green for empty slots
           }
           
-          row.appendChild(cell);
+          // Draw cell background
+          pdf.rect(x, rowY, cellWidth, cellHeight, 'F');
+          
+          // Draw cell content
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(8);
+          
+          if (slotData?.courses?.length > 0) {
+            const course = slotData.courses[0];
+            pdf.text(course.title || '', x + cellWidth / 2, rowY + cellHeight / 2 - 3, { align: 'center', baseline: 'middle' });
+            pdf.text(course.code || '', x + cellWidth / 2, rowY + cellHeight / 2, { align: 'center', baseline: 'middle' });
+            pdf.text(course.gcr_code || '', x + cellWidth / 2, rowY + cellHeight / 2 + 3, { align: 'center', baseline: 'middle' });
+          } else {
+            pdf.text('No class', x + cellWidth / 2, rowY + cellHeight / 2, { align: 'center', baseline: 'middle' });
+          }
+          
+          // Draw cell border
+          pdf.setDrawColor(0);
+          pdf.rect(x, rowY, cellWidth, cellHeight);
         });
-        
-        tempDiv.appendChild(row);
       }
       
-      // Add the temporary div to the document
-      document.body.appendChild(tempDiv);
-      
-      // Update the style for manually edited cells
-      const styles = document.createElement('style');
-      styles.textContent = `
-        .timetable-grid-download {
-          display: grid;
-          grid-template-columns: 100px repeat(10, 1fr);
-          gap: 2px;
-          padding: 20px;
-          background: #1a1a1a;
-          font-family: system-ui, -apple-system, sans-serif;
-          width: fit-content;
-        }
-        .grid-row {
-          display: contents;
-        }
-        .grid-cell {
-          background: #2a2a2a;
-          color: white;
-          padding: 12px;
-          min-height: 80px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          font-size: 14px;
-        }
-        .time-header, .day-label {
-          background: #2d3748;
-          font-weight: 600;
-          justify-content: center;
-          align-items: center;
-        }
-        .subject-cell {
-          background: #1E2A1E;
-        }
-        .subject-cell.theory {
-          background: rgba(255, 193, 7, 0.15);
-          border: 1px solid rgba(255, 193, 7, 0.3);
-        }
-        .subject-cell.practical {
-          background: rgba(40, 167, 69, 0.15);
-          border: 1px solid rgba(40, 167, 69, 0.3);
-        }
-        .subject-cell.manual-edit {
-          background: rgba(30, 64, 175, 0.3);  /* Dark blue background */
-          border: 1px solid rgba(30, 64, 175, 0.5);  /* Darker blue border */
-          color: #bfdbfe;  /* Light blue text */
-        }
-        .subject-title {
-          font-weight: 500;
-          color: white;
-        }
-        .subject-code, .subject-room {
-          font-size: 12px;
-          color: rgba(255, 255, 255, 0.6);
-        }
-        .empty-slot {
-          background: #1E2A1E;
-        }
-      `;
-      document.head.appendChild(styles);
-      
-      // Capture the timetable as an image
-      const canvas = await html2canvas(tempDiv, {
-        backgroundColor: '#1a1a1a',
-        scale: 2,
-        logging: false,
-        width: tempDiv.offsetWidth,
-        height: tempDiv.offsetHeight
-      });
-      
-      // Remove the temporary elements
-      document.body.removeChild(tempDiv);
-      document.head.removeChild(styles);
-      
-      // Convert to image and download
-      const image = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = 'timetable.png';
-      link.href = image;
-      link.click();
+      // Save the PDF
+      pdf.save('timetable.pdf');
       
     } catch (error) {
       console.error('Error downloading timetable:', error);

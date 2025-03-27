@@ -6,7 +6,7 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "cd frontend && cp .npmrc ~/.npmrc && npm install --no-optional && node deploy-fix.js && npm run prepare-assets && npm run build",
+        "buildCommand": "node deploy-fix.js && cd frontend && npm install --no-optional && npm run prepare-assets && npm run build",
         "distDir": "build"
       }
     }
