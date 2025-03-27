@@ -18,21 +18,31 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
 
-# Enable CORS for your frontend domain
-CORS(app, origins=["https://academia-khaki.vercel.app", "http://localhost:3000"])
+# Enable CORS for all routes with proper configuration
+CORS(app, origins=["https://academia-khaki.vercel.app", "http://localhost:3000"], supports_credentials=True, allow_headers=["Content-Type", "Authorization"])
 
 active_scrapers = {}
 
 def async_scraper(email, password):
     """Run scraper in background."""
-    from scrape_attendance import run_scraper
     try:
-        print(f"Starting scraper for {email}")
-        success = run_scraper(email, password)
-        print(f"Scraper finished for {email} with success: {success}")
-        active_scrapers[email] = {"status": "completed" if success else "failed"}
+        print(f"Starting attendance scraper for {email}")
+        # Import here to avoid circular imports
+        # This is the correct import statement for srm_scrapper
+        import srm_scrapper
+        
+        # Use the "attendance" type to only run attendance & marks scraper
+        success = srm_scrapper.run_scraper(email, password, scraper_type="attendance")
+        print(f"Attendance scraper finished for {email} with success: {success}")
+        
+        active_scrapers[email] = {
+            "status": "completed" if success else "failed",
+            "updated_at": datetime.utcnow().isoformat()
+        }
     except Exception as e:
-        print(f"Scraper error for {email}: {e}")
+        print(f"Attendance scraper error for {email}: {e}")
+        import traceback
+        traceback.print_exc()
         active_scrapers[email] = {"status": "failed", "error": str(e)}
 
 def delayed_timetable_scraper(email, password, delay_seconds=1):
@@ -41,18 +51,20 @@ def delayed_timetable_scraper(email, password, delay_seconds=1):
     active_scrapers[f"timetable_{email}"] = {"status": "waiting"}
     
     try:
-        from scrape_timetable import main_flow
+        # Import here to avoid circular imports
+        import srm_scrapper
         print(f"Starting timetable scraper for {email} after {delay_seconds}s delay")
         active_scrapers[f"timetable_{email}"] = {"status": "running"}
-        result = main_flow(email, password)
-        success = result["status"] == "success"
+        # Use the "timetable" type to only run timetable scraper
+        success = srm_scrapper.run_scraper(email, password, scraper_type="timetable")
         print(f"Timetable scraper finished for {email} with success: {success}")
         active_scrapers[f"timetable_{email}"] = {
-            "status": "completed" if success else "failed",
-            "result": result
+            "status": "completed" if success else "failed"
         }
     except Exception as e:
         print(f"Timetable scraper error for {email}: {e}")
+        import traceback
+        traceback.print_exc()
         active_scrapers[f"timetable_{email}"] = {"status": "failed", "error": str(e)}
 
 def unified_async_scraper(email, password):
@@ -61,35 +73,21 @@ def unified_async_scraper(email, password):
         print(f"Starting unified scraper for {email}")
         # Initialize both statuses
         active_scrapers[email] = {"status": "running"}
-        active_scrapers[f"timetable_{email}"] = {"status": "running"}
         
-        # Import here to avoid circular imports
-        from srm_scrapper import run_scraper
-        
-        # Run the unified scraper
-        result = run_scraper(email, password, scraper_type="unified")
-        
-        # Update attendance status
-        active_scrapers[email] = {
-            "status": "completed" if result.get("attendance_success", False) else "failed"
-        }
-        
-        # Update timetable status
-        if result.get("timetable_success", False):
-            active_scrapers[f"timetable_{email}"] = {
-                "status": "completed",
-                "result": result.get("timetable_data", {})
-            }
-        else:
-            active_scrapers[f"timetable_{email}"] = {"status": "failed"}
+        # For refresh, we only need to run the attendance scraper (which includes marks)
+        # as timetable doesn't change frequently
+        threading.Thread(
+            target=async_scraper,
+            args=(email, password),
+            daemon=True
+        ).start()
             
-        print(f"Unified scraper completed for {email}")
+        print(f"Refresh scraper started for {email}")
     except Exception as e:
         print(f"Unified scraper error: {e}")
         import traceback
         traceback.print_exc()  # Print full traceback for debugging
         active_scrapers[email] = {"status": "failed", "error": str(e)}
-        active_scrapers[f"timetable_{email}"] = {"status": "failed", "error": str(e)}
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -161,12 +159,32 @@ def login_route():
             "exp": datetime.utcnow() + timedelta(hours=24)
         }, os.getenv("JWT_SECRET", "default-secret-key"))
 
-        # 5) Start the unified scraper
-        threading.Thread(
-            target=unified_async_scraper,
-            args=(email, password),
-            daemon=True
-        ).start()
+        # 5) First, check if user already has timetable data
+        timetable_resp = supabase.table("timetable").select("*").eq("user_id", user["id"]).execute()
+        if not timetable_resp.data or len(timetable_resp.data) == 0:
+            # If no timetable data exists, we need to run timetable scraper first
+            print(f"No timetable data found for {email}, starting timetable scraper first")
+            # Start timetable scraper first
+            threading.Thread(
+                target=delayed_timetable_scraper,
+                args=(email, password, 0),  # No delay for first run
+                daemon=True
+            ).start()
+            
+            # Then start attendance scraper with a delay
+            threading.Thread(
+                target=async_scraper,
+                args=(email, password),
+                daemon=True
+            ).start()
+        else:
+            # If timetable data exists, just update attendance and marks
+            print(f"Timetable data exists for {email}, updating attendance only")
+            threading.Thread(
+                target=async_scraper,
+                args=(email, password),
+                daemon=True
+            ).start()
 
         return jsonify({
             "success": True,
@@ -437,6 +455,115 @@ def register():
         })
     except Exception as e:
         print(f"Registration error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/refresh-data", methods=["POST", "OPTIONS"])
+def refresh_data():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+    
+    try:
+        # Get authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"success": False, "error": "No token provided"}), 401
+
+        token = auth_header.split(" ")[1]
+        
+        try:
+            # Decode JWT token to get user information
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            user_id = payload["id"]
+            email = payload["email"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+        
+        # Get password from database or request
+        user_resp = supabase.table("users").select("*").eq("id", user_id).execute()
+        if not user_resp.data:
+            return jsonify({"success": False, "error": "User not found"}), 404
+            
+        # Get stored password or fetch from request
+        data = request.get_json() or {}
+        password = data.get("password")
+        
+        # Start the unified scraper in background
+        active_scrapers[email] = {"status": "running", "started_at": datetime.utcnow().isoformat()}
+        
+        # Update the timestamp in the attendance and marks tables
+        current_time = datetime.utcnow().isoformat()
+        
+        # Run the unified scraper in a background thread
+        threading.Thread(
+            target=unified_async_scraper,
+            args=(email, password if password else user_resp.data[0].get("password")),
+            daemon=True
+        ).start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Refresh process started",
+            "status": "running"
+        }), 202
+        
+    except Exception as e:
+        print(f"Error starting refresh: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/refresh-status", methods=["GET", "OPTIONS"])
+def check_refresh_status():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+    
+    try:
+        # Get authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"success": False, "error": "No token provided"}), 401
+
+        token = auth_header.split(" ")[1]
+        
+        try:
+            # Decode JWT token to get user information
+            payload = jwt.decode(token, os.getenv('JWT_SECRET', 'default-secret-key'), algorithms=["HS256"])
+            user_id = payload["id"]
+            email = payload["email"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"success": False, "error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False, "error": "Invalid token"}), 401
+        
+        # Get attendance scraper status
+        status = active_scrapers.get(email, {"status": "not_started"})
+        
+        # If completed, get the updated timestamps from the database
+        if status.get("status") == "completed":
+            # Get attendance updated timestamp
+            att_resp = supabase.table("attendance").select("created_at,updated_at").eq("user_id", user_id).execute()
+            marks_resp = supabase.table("marks").select("created_at,updated_at").eq("user_id", user_id).execute()
+            
+            updated_at = None
+            if att_resp.data and len(att_resp.data) > 0:
+                updated_at = att_resp.data[0].get("updated_at")
+            elif marks_resp.data and len(marks_resp.data) > 0:
+                updated_at = marks_resp.data[0].get("updated_at")
+                
+            if updated_at:
+                status["updated_at"] = updated_at
+        
+        return jsonify({
+            "success": True,
+            "status": status.get("status", "not_started"),
+            "updated_at": status.get("updated_at", None)
+        }), 200
+        
+    except Exception as e:
+        print(f"Error checking refresh status: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":

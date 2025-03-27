@@ -420,36 +420,27 @@ def verify_session():
 @app.route('/api/refresh-data', methods=['POST'])
 def refresh_data():
     try:
-        # Get token and verify
+        # Verify user token
         auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({'error': 'No token provided'}), 401
-            
         token = auth_header.split(' ')[1]
         email = verify_token(token)
         
-        # Get user_id
+        # Get user ID
         user_query = supabase.table("users").select("id").eq("email", email).execute()
-        if not user_query.data:
-            return jsonify({'error': 'User not found'}), 404
         user_id = user_query.data[0]['id']
         
         # Get stored cookies
         stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
-        if not stored_data.data:
-            return jsonify({'error': 'No stored session found'}), 404
-            
         cookies = stored_data.data[0].get('cookies', {})
         
-        # Start attendance scraper
-        def refresh_attendance_only():
+        # Start scraper in background
+        def run_attendance_scraper():
             try:
                 from srm_scrapper import SRMScraper
                 scraper = SRMScraper(email, None)
                 driver = scraper.setup_driver()
                 
-                # Fixed cookie handling
-                print("🔄 Applying stored cookies...")
+                # Apply cookies
                 driver.get("https://academia.srmist.edu.in")
                 for name, value in cookies.items():
                     driver.add_cookie({
@@ -458,46 +449,33 @@ def refresh_data():
                         'domain': '.srmist.edu.in'
                     })
                 
-                print("📊 Fetching attendance data...")
+                # ONLY get attendance page (which includes marks)
                 html_source = scraper.get_attendance_page()
                 
                 if html_source:
-                    # Update both attendance and marks
+                    # Update attendance and marks
                     attendance_success = scraper.parse_and_save_attendance(html_source, driver)
                     marks_success = scraper.parse_and_save_marks(html_source, driver)
                     
-                    # Update timestamps in database
+                    # Update timestamps
                     current_time = datetime.utcnow().isoformat()
-                    if attendance_success:
-                        supabase.table('attendance').update({
-                            'updated_at': current_time
-                        }).eq('user_id', user_id).execute()
+                    supabase.table('attendance').update({
+                        'updated_at': current_time
+                    }).eq('user_id', user_id).execute()
                     
-                    if marks_success:
-                        supabase.table('marks').update({
-                            'updated_at': current_time
-                        }).eq('user_id', user_id).execute()
+                    supabase.table('marks').update({
+                        'updated_at': current_time
+                    }).eq('user_id', user_id).execute()
                     
-                    print(f"✅ Data refresh completed - Attendance: {attendance_success}, Marks: {marks_success}")
-                else:
-                    print("❌ Failed to load attendance page")
+                    print(f"✅ Attendance/marks updated: {attendance_success}/{marks_success}")
                 
                 driver.quit()
                 
             except Exception as e:
-                print(f"❌ Refresh error: {str(e)}")
-                traceback.print_exc()
+                print(f"❌ Scraper error: {str(e)}")
         
-        # Start refresh in background
-        threading.Thread(
-            target=refresh_attendance_only,
-            daemon=True
-        ).start()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Refresh started'
-        })
+        threading.Thread(target=run_attendance_scraper, daemon=True).start()
+        return jsonify({'success': True, 'message': 'Refresh started'})
         
     except Exception as e:
         print(f"❌ Refresh error: {str(e)}")
@@ -505,28 +483,18 @@ def refresh_data():
 
 @app.route('/api/refresh-status', methods=['GET'])
 def get_refresh_status():
-    """Check when attendance was last updated"""
     try:
         auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({'error': 'No token provided'}), 401
-            
         token = auth_header.split(' ')[1]
         email = verify_token(token)
         
-        # Get user_id
+        # Get user ID
         user_query = supabase.table("users").select("id").eq("email", email).execute()
-        if not user_query.data:
-            return jsonify({'error': 'User not found'}), 404
         user_id = user_query.data[0]['id']
         
         # Get last update times
-        print(f"Checking status for user_id: {user_id}")
         attendance_data = supabase.table('attendance').select('updated_at').eq('user_id', user_id).execute()
         marks_data = supabase.table('marks').select('updated_at').eq('user_id', user_id).execute()
-        
-        print(f"Found attendance data: {attendance_data.data}")
-        print(f"Found marks data: {marks_data.data}")
         
         return jsonify({
             'success': True,
@@ -535,7 +503,7 @@ def get_refresh_status():
         })
         
     except Exception as e:
-        print(f"❌ Status check error: {str(e)}")
+        print(f"Status check error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/quick-login', methods=['POST'])
@@ -574,5 +542,54 @@ def quick_login():
                 'message': 'Stored session expired, please login with password'
             }), 401
             
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/scraper-status', methods=['POST'])
+def start_scraper():
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No token provided'}), 401
+            
+        token = auth_header.split(' ')[1]
+        email = verify_token(token)
+        
+        # Get stored cookies
+        stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
+        if not stored_data.data:
+            return jsonify({'error': 'No stored session found'}), 404
+            
+        cookies = stored_data.data[0].get('cookies', {})
+        
+        # Start attendance scraper in background
+        def refresh_attendance():
+            try:
+                scraper = SRMScraper(email, None)
+                driver = scraper.setup_driver()
+                
+                # Use stored cookies
+                driver.get("https://academia.srmist.edu.in")
+                for name, value in cookies.items():
+                    driver.add_cookie({
+                        'name': name,
+                        'value': value,
+                        'domain': '.srmist.edu.in'
+                    })
+                
+                # Get attendance page (which includes marks)
+                html_source = scraper.get_attendance_page()
+                if html_source:
+                    scraper.parse_and_save_attendance(html_source, driver)
+                    scraper.parse_and_save_marks(html_source, driver)
+                
+                driver.quit()
+                
+            except Exception as e:
+                print(f"Scraper error: {str(e)}")
+        
+        threading.Thread(target=refresh_attendance, daemon=True).start()
+        return jsonify({'status': 'started'})
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500 

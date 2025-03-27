@@ -1,0 +1,47 @@
+.refresh-container {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.refresh-button {
+  padding: 10px 20px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.3s;
+}
+
+.refresh-button.refreshing {
+  background: #2196F3;
+  padding-right: 40px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  position: absolute;
+  margin-left: 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.last-update {
+  margin-top: 10px;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.error-message {
+  color: #ff4444;
+  margin-top: 10px;
+} 

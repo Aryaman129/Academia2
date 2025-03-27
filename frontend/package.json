@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "acadia",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -8,6 +8,7 @@
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.6.2",
+    "html2canvas": "^1.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
@@ -19,7 +20,11 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "generate-assets": "node generate-assets.js",
+    "prepare-assets": "npm run generate-assets",
+    "generate-logos": "echo \"Deprecated - use generate-assets instead\"",
+    "generate-favicon": "echo \"Deprecated - use generate-assets instead\""
   },
   "eslintConfig": {
     "extends": [
@@ -40,7 +45,8 @@
     ]
   },
   "devDependencies": {
-    "crypto-browserify": "^3.12.1"
+    "crypto-browserify": "^3.12.0",
+    "svg2png-cli": "^1.1.1"
   },
   "browser": {
     "crypto": false

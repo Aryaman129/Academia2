@@ -6,6 +6,10 @@ import LoadingIndicator from "./LoadingIndicator"
 import "./Auth.css" // We'll create this file next
 
 // Create axios instance with proper config
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('LOCAL_API_URL:', process.env.REACT_APP_LOCAL_API_URL);
+console.log('API_URL:', process.env.REACT_APP_API_URL);
+
 const api = axios.create({
   baseURL: process.env.NODE_ENV === 'development' 
     ? process.env.REACT_APP_LOCAL_API_URL 
@@ -15,6 +19,8 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 })
+
+console.log('Using API URL:', api.defaults.baseURL);
 
 // Add response interceptor for better error handling
 api.interceptors.response.use(

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Light gray background -->
+  <rect width="200" height="200" fill="#e0e0e0"/>
+  <!-- Stylized A logo with dots -->
+  <g>
+    <!-- Left dot -->
+    <circle cx="40" cy="100" r="8" fill="#1a1a1a"/>
+    
+    <!-- Right dot -->
+    <circle cx="160" cy="100" r="8" fill="#1a1a1a"/>
+    
+    <!-- Stylized letter A -->
+    <path d="M60,150 L90,50 L110,50 L140,150 L120,150 L115,135 L85,135 L80,150 L60,150 Z
+             M100,75 L90,115 L110,115 L100,75 Z
+             M70,100 L130,100 L125,115 L75,115 L70,100 Z" fill="#1a1a1a"/>
+  </g>
+</svg> 

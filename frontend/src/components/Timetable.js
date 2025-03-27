@@ -63,7 +63,11 @@ const Timetable = () => {
 
   const fetchTimetable = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/timetable`);
+      const apiUrl = process.env.NODE_ENV === 'development' 
+        ? process.env.REACT_APP_LOCAL_API_URL 
+        : process.env.REACT_APP_API_URL;
+      
+      const response = await axios.get(`${apiUrl}/api/timetable`);
       const formattedData = response.data.map(item => ({
         name: item.course_title,
         code: item.course_code,
@@ -246,40 +250,52 @@ const Timetable = () => {
         </div>
       )}
 
-      <div className="timetable-view">
-        <div className="timetable-grid">
-          <div className="time-slot"></div>
-          {timeSlots.map((time, index) => (
-            <div key={`time-${index}`} className="time-slot">{time}</div>
-          ))}
+      <div className="timetable-grid">
+        <div className="time-slot"></div>
+        {timeSlots.map((time, index) => (
+          <div key={`time-${index}`} className="time-slot">{time}</div>
+        ))}
 
-          {days.map((day, dayIndex) => (
-            <React.Fragment key={`day-${dayIndex}`}>
-              <div className="time-slot day-label">{day}</div>
-              {timeSlots.map((timeSlot, timeIndex) => {
-                const subject = getSubjectForCell(day, timeSlot);
-                const cellClass = subject
-                  ? `subject-cell ${subject.category?.toLowerCase() || 'theory'} ${subject.code === 'Custom' ? 'custom' : ''} ${subject.code === 'Event' ? 'event' : ''}`
-                  : 'subject-cell empty';
+        {days.map((day, dayIndex) => (
+          <React.Fragment key={`day-${dayIndex}`}>
+            <div className="time-slot day-label">{day}</div>
+            {timeSlots.map((timeSlot, timeIndex) => {
+              const subject = getSubjectForCell(day, timeSlot);
+              const isEditable = editingCell?.day === day && editingCell?.timeSlot === timeSlot;
+              const cellClass = `subject-cell ${subject?.category?.toLowerCase() || 'empty'} ${isEditing ? 'editable' : ''} ${subject?.code === 'Custom' ? 'custom' : ''} ${subject?.code === 'Event' ? 'event' : ''}`;
 
-                return (
-                  <div
-                    key={`cell-${dayIndex}-${timeIndex}`}
-                    className={cellClass}
-                    onClick={() => handleCellClick(day, timeSlot)}
-                  >
-                    {subject && (
+              return (
+                <div
+                  key={`cell-${dayIndex}-${timeIndex}`}
+                  className={cellClass}
+                  onClick={() => handleCellClick(day, timeSlot)}
+                >
+                  {isEditable ? (
+                    <input
+                      type="text"
+                      className="cell-edit-input"
+                      defaultValue={subject?.name || ''}
+                      autoFocus
+                      onBlur={(e) => handleCellEdit(day, timeSlot, e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCellEdit(day, timeSlot, e.target.value);
+                        }
+                      }}
+                    />
+                  ) : (
+                    subject && (
                       <>
                         <div className="subject-name">{subject.name}</div>
                         <div className="subject-code">{subject.code}</div>
                       </>
-                    )}
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          ))}
-        </div>
+                    )
+                  )}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
       </div>
 
       {showDownload && (
