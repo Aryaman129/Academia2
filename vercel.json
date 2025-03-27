@@ -3,11 +3,12 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/package.json",
+      "src": "vercel-build.sh",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "node deploy-fix.js && cd frontend && npm install --no-optional && npm run prepare-assets && npm run build",
-        "distDir": "build"
+        "distDir": "frontend/build",
+        "buildCommand": "chmod +x vercel-build.sh && ./vercel-build.sh",
+        "zeroConfig": true
       }
     }
   ],
@@ -37,5 +38,9 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "github": {
+    "enabled": true,
+    "silent": true
+  }
 } 

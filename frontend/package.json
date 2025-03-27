@@ -18,7 +18,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "generate-assets": "node generate-assets.js",
@@ -26,6 +26,10 @@
     "generate-logos": "echo \"Deprecated - use generate-assets instead\"",
     "generate-favicon": "echo \"Deprecated - use generate-assets instead\"",
     "preinstall": "echo 'Setting npm config for PhantomJS' && npm config set phantomjs_cdnurl=http://cnpmjs.org/downloads && npm config set puppeteer_skip_chromium_download=true && npm config set phantomjs_skip_download=true"
+  },
+  "overrides": {
+    "phantomjs": "npm:@npm/nothing",
+    "phantomjs-prebuilt": "npm:@npm/nothing"
   },
   "eslintConfig": {
     "extends": [

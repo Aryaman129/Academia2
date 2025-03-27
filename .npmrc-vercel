@@ -1,0 +1,4 @@
+phantomjs_cdnurl=http://localhost:9999/phantomjs
+phantomjs_skip_download=true
+puppeteer_skip_chromium_download=true
+ignore-scripts=true 
