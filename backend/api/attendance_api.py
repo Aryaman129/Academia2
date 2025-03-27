@@ -419,7 +419,6 @@ def verify_session():
 
 @app.route('/api/refresh-data', methods=['POST'])
 def refresh_data():
-    """Refresh only attendance and marks data using stored cookies"""
     try:
         # Get token and verify
         auth_header = request.headers.get('Authorization')
@@ -446,23 +445,38 @@ def refresh_data():
         def refresh_attendance_only():
             try:
                 from srm_scrapper import SRMScraper
-                scraper = SRMScraper(email, None)  # No password needed
+                scraper = SRMScraper(email, None)
                 driver = scraper.setup_driver()
                 
-                # Apply stored cookies
+                # Fixed cookie handling
                 print("🔄 Applying stored cookies...")
                 driver.get("https://academia.srmist.edu.in")
-                for cookie in cookies:
-                    driver.add_cookie(cookie)
+                for name, value in cookies.items():
+                    driver.add_cookie({
+                        'name': name,
+                        'value': value,
+                        'domain': '.srmist.edu.in'
+                    })
                 
-                # Get attendance page
                 print("📊 Fetching attendance data...")
                 html_source = scraper.get_attendance_page()
                 
                 if html_source:
-                    # Update attendance and marks
+                    # Update both attendance and marks
                     attendance_success = scraper.parse_and_save_attendance(html_source, driver)
                     marks_success = scraper.parse_and_save_marks(html_source, driver)
+                    
+                    # Update timestamps in database
+                    current_time = datetime.utcnow().isoformat()
+                    if attendance_success:
+                        supabase.table('attendance').update({
+                            'updated_at': current_time
+                        }).eq('user_id', user_id).execute()
+                    
+                    if marks_success:
+                        supabase.table('marks').update({
+                            'updated_at': current_time
+                        }).eq('user_id', user_id).execute()
                     
                     print(f"✅ Data refresh completed - Attendance: {attendance_success}, Marks: {marks_success}")
                 else:

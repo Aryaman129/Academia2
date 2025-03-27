@@ -26,7 +26,13 @@ const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }
     }
   };
 
-  const getSubjectForCell = (day, timeSlot) => {
+  const getDayFromDayOrder = (dayOrder) => {
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][dayOrder - 1] || '';
+  };
+
+  const getSubjectForCell = (dayOrder, timeSlot) => {
+    const day = getDayFromDayOrder(dayOrder);
+    
     // Check for events first
     if (currentWeek) {
       const eventForDay = Object.entries(events).find(([dateStr, event]) => {
@@ -54,7 +60,7 @@ const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }
 
     // Then check regular timetable
     return timetableData.find(
-      subject => subject.dayOrder === day && subject.startTime === timeSlot
+      subject => subject.day_order === dayOrder && subject.startTime === timeSlot
     );
   };
 
@@ -64,7 +70,7 @@ const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }
     '3:10 - 4:00', '4:00 - 4:50'
   ];
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const dayOrders = [1, 2, 3, 4, 5];
 
   return (
     <div className="timetable-download">
@@ -76,18 +82,16 @@ const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }
       </button>
 
       <div className="timetable-grid" ref={timetableRef}>
-        {/* Time slots header */}
         <div className="time-slot"></div>
         {timeSlots.map((time, index) => (
           <div key={`time-${index}`} className="time-slot">{time}</div>
         ))}
 
-        {/* Days and cells */}
-        {days.map((day, dayIndex) => (
+        {dayOrders.map((dayOrder, dayIndex) => (
           <React.Fragment key={`day-${dayIndex}`}>
-            <div className="time-slot day-label">{day}</div>
+            <div className="time-slot day-label">{getDayFromDayOrder(dayOrder)}</div>
             {timeSlots.map((timeSlot, timeIndex) => {
-              const subject = getSubjectForCell(day, timeSlot);
+              const subject = getSubjectForCell(dayOrder, timeSlot);
               const cellClass = subject
                 ? `subject-cell ${subject.category?.toLowerCase() || 'theory'} ${subject.code === 'Custom' ? 'custom' : ''} ${subject.code === 'Event' ? 'event' : ''}`
                 : 'subject-cell empty';

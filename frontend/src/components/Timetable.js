@@ -67,7 +67,8 @@ const Timetable = () => {
       const formattedData = response.data.map(item => ({
         name: item.course_title,
         code: item.course_code,
-        category: item.category,
+        category: item.category || 'Theory',
+        day_order: item.day_order,
         dayOrder: getDayFromDayOrder(item.day_order),
         startTime: formatTime(item.start_time),
         isOnline: item.mode === 'online'
@@ -75,6 +76,7 @@ const Timetable = () => {
       setTimetableData(formattedData);
       setLoading(false);
     } catch (err) {
+      console.error('Timetable fetch error:', err);
       setError('Failed to load timetable');
       setLoading(false);
     }
@@ -132,7 +134,8 @@ const Timetable = () => {
   };
 
   const getSubjectForCell = (day, timeSlot) => {
-    // Check for events first
+    const dayOrderNum = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].indexOf(day) + 1;
+    
     const eventForDay = Object.entries(events).find(([dateStr, event]) => {
       return isDateInCurrentWeek(dateStr) && event.dayOrder === day;
     });
@@ -148,13 +151,11 @@ const Timetable = () => {
       };
     }
 
-    // Check for custom entry
     const customEntry = customEntries[`${day}-${timeSlot}`];
     if (customEntry) return customEntry;
 
-    // Then check regular timetable
     return timetableData.find(
-      subject => subject.dayOrder === day && subject.startTime === timeSlot
+      subject => subject.day_order === dayOrderNum && subject.startTime === timeSlot
     );
   };
 
@@ -257,34 +258,21 @@ const Timetable = () => {
               <div className="time-slot day-label">{day}</div>
               {timeSlots.map((timeSlot, timeIndex) => {
                 const subject = getSubjectForCell(day, timeSlot);
-                const isEditable = editingCell?.day === day && editingCell?.timeSlot === timeSlot;
+                const cellClass = subject
+                  ? `subject-cell ${subject.category?.toLowerCase() || 'theory'} ${subject.code === 'Custom' ? 'custom' : ''} ${subject.code === 'Event' ? 'event' : ''}`
+                  : 'subject-cell empty';
 
                 return (
                   <div
                     key={`cell-${dayIndex}-${timeIndex}`}
-                    className={`subject-cell ${subject?.category?.toLowerCase() || 'empty'} ${isEditing ? 'editable' : ''} ${subject?.code === 'Custom' ? 'custom' : ''} ${subject?.code === 'Event' ? 'event' : ''}`}
+                    className={cellClass}
                     onClick={() => handleCellClick(day, timeSlot)}
                   >
-                    {isEditable ? (
-                      <input
-                        type="text"
-                        className="cell-edit-input"
-                        defaultValue={subject?.name || ''}
-                        autoFocus
-                        onBlur={(e) => handleCellEdit(day, timeSlot, e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleCellEdit(day, timeSlot, e.target.value);
-                          }
-                        }}
-                      />
-                    ) : (
-                      subject && (
-                        <>
-                          <div className="subject-name">{subject.name}</div>
-                          <div className="subject-code">{subject.code}</div>
-                        </>
-                      )
+                    {subject && (
+                      <>
+                        <div className="subject-name">{subject.name}</div>
+                        <div className="subject-code">{subject.code}</div>
+                      </>
                     )}
                   </div>
                 );
@@ -296,7 +284,7 @@ const Timetable = () => {
 
       {showDownload && (
         <TimetableDownload 
-          timetableData={timetableData} 
+          timetableData={timetableData}
           customEntries={customEntries}
           events={events}
           currentWeek={currentWeek}

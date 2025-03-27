@@ -8,7 +8,7 @@ const RefreshButton = () => {
   const checkStatus = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log("Checking refresh status...");
+      console.log("🔍 Checking status with token:", token?.substring(0, 10) + "...");
       
       const response = await fetch('https://academia2-1.onrender.com/api/refresh-status', {
         headers: {
@@ -17,20 +17,24 @@ const RefreshButton = () => {
       });
       
       const data = await response.json();
-      console.log("Status response:", data);
+      console.log("📊 Status response:", data);
       
       if (data.success) {
+        console.log("✅ Update times:", {
+          attendance: new Date(data.attendance_last_update).toLocaleString(),
+          marks: new Date(data.marks_last_update).toLocaleString()
+        });
         setLastUpdate({
           attendance: data.attendance_last_update,
           marks: data.marks_last_update
         });
         setError(null);
       } else {
-        console.error('Status check failed:', data.error);
+        console.error('❌ Status check failed:', data.error);
         setError(data.error);
       }
     } catch (error) {
-      console.error('Error checking status:', error);
+      console.error('❌ Error checking status:', error);
       setError('Failed to check status');
     }
   };
@@ -38,10 +42,11 @@ const RefreshButton = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     setError(null);
+    console.log("🔄 Starting refresh...");
     
     try {
       const token = localStorage.getItem('token');
-      console.log("Starting refresh...");
+      console.log("🔑 Using token:", token?.substring(0, 10) + "...");
       
       const response = await fetch('https://academia2-1.onrender.com/api/refresh-data', {
         method: 'POST',
@@ -51,25 +56,32 @@ const RefreshButton = () => {
       });
       
       const data = await response.json();
-      console.log("Refresh response:", data);
+      console.log("📡 Refresh response:", data);
       
       if (data.success) {
-        // Check status multiple times as scraping takes time
-        const checkInterval = setInterval(async () => {
-          await checkStatus();
-        }, 5000); // Check every 5 seconds
+        console.log("✅ Refresh started, checking status...");
+        // Check status every 5 seconds for up to 1 minute
+        let attempts = 0;
+        const maxAttempts = 12;
         
-        // Stop checking after 30 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          setIsRefreshing(false);
-        }, 30000);
+        const checkInterval = setInterval(async () => {
+          attempts++;
+          console.log(`🔄 Status check attempt ${attempts}/${maxAttempts}`);
+          await checkStatus();
+          
+          if (attempts >= maxAttempts) {
+            console.log("⏱️ Max attempts reached, stopping checks");
+            clearInterval(checkInterval);
+            setIsRefreshing(false);
+          }
+        }, 5000);
       } else {
+        console.error("❌ Refresh failed:", data.error);
         setError(data.error);
         setIsRefreshing(false);
       }
     } catch (error) {
-      console.error('Refresh failed:', error);
+      console.error('❌ Refresh failed:', error);
       setError('Failed to refresh data');
       setIsRefreshing(false);
     }
@@ -99,18 +111,10 @@ const RefreshButton = () => {
       {lastUpdate && (
         <div className="last-update-container">
           <div className="update-item">
-            <span className="update-label">Attendance Last Updated:</span>
+            <span className="update-label">Last Updated:</span>
             <span className="update-time">
               {lastUpdate.attendance ? 
                 new Date(lastUpdate.attendance).toLocaleString() : 
-                'Not yet updated'}
-            </span>
-          </div>
-          <div className="update-item">
-            <span className="update-label">Marks Last Updated:</span>
-            <span className="update-time">
-              {lastUpdate.marks ? 
-                new Date(lastUpdate.marks).toLocaleString() : 
                 'Not yet updated'}
             </span>
           </div>
