@@ -18,14 +18,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "build": "CI=false SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "generate-assets": "node generate-assets.js",
-    "prepare-assets": "npm run generate-assets",
-    "generate-logos": "echo \"Deprecated - use generate-assets instead\"",
-    "generate-favicon": "echo \"Deprecated - use generate-assets instead\"",
-    "preinstall": "echo 'Setting npm config for PhantomJS' && npm config set phantomjs_cdnurl=http://cnpmjs.org/downloads && npm config set puppeteer_skip_chromium_download=true && npm config set phantomjs_skip_download=true"
+    "prepare-assets": "npm run generate-assets"
   },
   "overrides": {
     "phantomjs": "npm:@npm/nothing",
@@ -50,9 +47,7 @@
     ]
   },
   "devDependencies": {
-    "crypto-browserify": "^3.12.0",
-    "svg2png-cli": "^1.1.1",
-    "create-react-app-build": "^1.0.4"
+    "crypto-browserify": "^3.12.0"
   },
   "browser": {
     "crypto": false

@@ -3,11 +3,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "build",
-        "buildCommand": "npm install --no-optional --ignore-scripts && CI=false npm run build"
+        "distDir": "frontend/build",
+        "buildCommand": "cd frontend && PHANTOMJS_SKIP_DOWNLOAD=true PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install --no-optional --ignore-scripts && npm run generate-assets && CI=false npm run build"
       }
     }
   ],
@@ -38,6 +38,11 @@
       "dest": "/index.html"
     }
   ],
+  "env": {
+    "PHANTOMJS_SKIP_DOWNLOAD": "true",
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+    "npm_config_ignore_scripts": "true"
+  },
   "github": {
     "enabled": true,
     "silent": true
