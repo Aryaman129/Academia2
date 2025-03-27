@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import html2canvas from 'html2canvas';
 import './Timetable.css';
 
-const TimetableDownload = ({ timetableData, customEntries }) => {
+const TimetableDownload = ({ timetableData, customEntries, events, currentWeek }) => {
   const timetableRef = useRef(null);
 
   const handleDownload = async () => {
@@ -11,7 +11,9 @@ const TimetableDownload = ({ timetableData, customEntries }) => {
     try {
       const canvas = await html2canvas(timetableRef.current, {
         scale: 2, // Higher quality
-        backgroundColor: '#1a1a1a'
+        backgroundColor: '#1a1a1a',
+        logging: true, // Enable logging for debugging
+        useCORS: true // Enable CORS for images
       });
 
       const link = document.createElement('a');
@@ -20,11 +22,33 @@ const TimetableDownload = ({ timetableData, customEntries }) => {
       link.click();
     } catch (err) {
       console.error('Failed to download timetable:', err);
+      alert('Failed to download timetable. Please try again.');
     }
   };
 
   const getSubjectForCell = (day, timeSlot) => {
-    // Check for custom entry first
+    // Check for events first
+    if (currentWeek) {
+      const eventForDay = Object.entries(events).find(([dateStr, event]) => {
+        const date = new Date(dateStr);
+        return date >= currentWeek.start && 
+               date <= currentWeek.end && 
+               event.dayOrder === day;
+      });
+
+      if (eventForDay) {
+        const [dateStr, event] = eventForDay;
+        const date = new Date(dateStr);
+        const formattedDate = `${date.getDate()}/${date.getMonth() + 1}`;
+        return {
+          name: `${event.text} (${formattedDate})`,
+          code: 'Event',
+          category: 'event'
+        };
+      }
+    }
+
+    // Check for custom entry
     const customEntry = customEntries[`${day}-${timeSlot}`];
     if (customEntry) return customEntry;
 
@@ -65,7 +89,7 @@ const TimetableDownload = ({ timetableData, customEntries }) => {
             {timeSlots.map((timeSlot, timeIndex) => {
               const subject = getSubjectForCell(day, timeSlot);
               const cellClass = subject
-                ? `subject-cell ${subject.category?.toLowerCase() || 'theory'} ${subject.code === 'Custom' ? 'custom' : ''}`
+                ? `subject-cell ${subject.category?.toLowerCase() || 'theory'} ${subject.code === 'Custom' ? 'custom' : ''} ${subject.code === 'Event' ? 'event' : ''}`
                 : 'subject-cell empty';
 
               return (

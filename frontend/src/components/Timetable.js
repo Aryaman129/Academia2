@@ -185,7 +185,7 @@ const Timetable = () => {
             {showCalendar ? 'Hide Calendar' : 'Mark Deadlines'}
           </button>
           <button 
-            className="action-button"
+            className={`action-button ${showDownload ? 'active' : ''}`}
             onClick={() => setShowDownload(!showDownload)}
           >
             {showDownload ? 'Hide Download View' : 'Show Download View'}
@@ -220,6 +220,7 @@ const Timetable = () => {
               )}
             </div>
           )}
+          
           <div className="events-list">
             <h3>Current Week Events</h3>
             {Object.entries(events)
@@ -239,8 +240,7 @@ const Timetable = () => {
                     </button>
                   </div>
                 );
-              })
-            }
+              })}
           </div>
         </div>
       )}

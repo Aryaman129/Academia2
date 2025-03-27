@@ -419,49 +419,76 @@ def verify_session():
 
 @app.route('/api/refresh-data', methods=['POST'])
 def refresh_data():
+    """Refresh only attendance and marks data using stored cookies"""
     try:
-        # 1. First verify your token
-        token = request.headers.get('Authorization').split(' ')[1]
+        # Get token and verify
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No token provided'}), 401
+            
+        token = auth_header.split(' ')[1]
         email = verify_token(token)
         
-        # 2. Get your stored cookies from Supabase
+        # Get user_id
+        user_query = supabase.table("users").select("id").eq("email", email).execute()
+        if not user_query.data:
+            return jsonify({'error': 'User not found'}), 404
+        user_id = user_query.data[0]['id']
+        
+        # Get stored cookies
         stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
+        if not stored_data.data:
+            return jsonify({'error': 'No stored session found'}), 404
+            
         cookies = stored_data.data[0].get('cookies', {})
         
-        # 3. This function runs in background to update attendance
+        # Start attendance scraper
         def refresh_attendance_only():
             try:
-                # Setup scraper without password (using stored cookies)
+                from srm_scrapper import SRMScraper
                 scraper = SRMScraper(email, None)  # No password needed
                 driver = scraper.setup_driver()
                 
-                # 4. Use your stored cookies to login
+                # Apply stored cookies
+                print("🔄 Applying stored cookies...")
                 driver.get("https://academia.srmist.edu.in")
                 for cookie in cookies:
                     driver.add_cookie(cookie)
                 
-                # 5. ONLY get attendance page
+                # Get attendance page
+                print("📊 Fetching attendance data...")
                 html_source = scraper.get_attendance_page()
+                
                 if html_source:
-                    # 6. Update both attendance and marks (they're on same page)
+                    # Update attendance and marks
                     attendance_success = scraper.parse_and_save_attendance(html_source, driver)
                     marks_success = scraper.parse_and_save_marks(html_source, driver)
-                    print(f"✅ Quick refresh completed!")
+                    
+                    print(f"✅ Data refresh completed - Attendance: {attendance_success}, Marks: {marks_success}")
+                else:
+                    print("❌ Failed to load attendance page")
                 
                 driver.quit()
                 
             except Exception as e:
                 print(f"❌ Refresh error: {str(e)}")
+                traceback.print_exc()
         
-        # 7. Start the refresh in background
-        threading.Thread(target=refresh_attendance_only, daemon=True).start()
+        # Start refresh in background
+        threading.Thread(
+            target=refresh_attendance_only,
+            daemon=True
+        ).start()
         
-        return jsonify({'success': True, 'message': 'Refresh started'})
+        return jsonify({
+            'success': True,
+            'message': 'Refresh started'
+        })
         
     except Exception as e:
+        print(f"❌ Refresh error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# Add endpoint to check refresh status
 @app.route('/api/refresh-status', methods=['GET'])
 def get_refresh_status():
     """Check when attendance was last updated"""
@@ -473,33 +500,28 @@ def get_refresh_status():
         token = auth_header.split(' ')[1]
         email = verify_token(token)
         
-        # FIXED: Get user_id first
+        # Get user_id
         user_query = supabase.table("users").select("id").eq("email", email).execute()
         if not user_query.data:
             return jsonify({'error': 'User not found'}), 404
-            
         user_id = user_query.data[0]['id']
         
-        # FIXED: Use correct table structure
-        attendance_data = supabase.table('attendance')\
-            .select('attendance_data,updated_at')\
-            .eq('user_id', user_id)\
-            .execute()
-            
-        marks_data = supabase.table('marks')\
-            .select('marks_data,updated_at')\
-            .eq('user_id', user_id)\
-            .execute()
+        # Get last update times
+        print(f"Checking status for user_id: {user_id}")
+        attendance_data = supabase.table('attendance').select('updated_at').eq('user_id', user_id).execute()
+        marks_data = supabase.table('marks').select('updated_at').eq('user_id', user_id).execute()
+        
+        print(f"Found attendance data: {attendance_data.data}")
+        print(f"Found marks data: {marks_data.data}")
         
         return jsonify({
             'success': True,
             'attendance_last_update': attendance_data.data[0]['updated_at'] if attendance_data.data else None,
-            'marks_last_update': marks_data.data[0]['updated_at'] if marks_data.data else None,
-            'has_data': bool(attendance_data.data and marks_data.data)
+            'marks_last_update': marks_data.data[0]['updated_at'] if marks_data.data else None
         })
         
     except Exception as e:
-        print(f"Refresh status error: {str(e)}")  # Add logging
+        print(f"❌ Status check error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/quick-login', methods=['POST'])
