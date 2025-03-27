@@ -379,97 +379,64 @@
   }
 }
 
-/* Password toggle button */
+/* Password field styling */
+.password-input {
+  width: 100%;
+  padding: 15px 18px;
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(70, 70, 90, 0.3);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}
+
+.password-reveal-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 15px 18px;
+  pointer-events: none;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+  font-size: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  display: flex;
+}
+
+.password-reveal-text span {
+  color: #ffffff;
+  opacity: 1;
+}
+
 .password-toggle {
   position: absolute;
   right: 15px;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
+  background: transparent;
   border: none;
-  padding: 5px;
   cursor: pointer;
-  color: rgba(200, 200, 220, 0.7);
-  transition: color 0.3s ease;
+  padding: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 0.3s ease;
 }
 
 .password-toggle:hover {
-  color: #4d4dff;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.password-toggle:focus {
-  outline: none;
-  color: #4d4dff;
-}
-
-/* Eye icon animations */
 .eye-icon {
-  transition: all 0.3s ease;
-}
-
-.eye-icon.eye-closed {
-  opacity: 0.7;
-}
-
-.eye-icon.eye-open {
-  opacity: 1;
-}
-
-.eye-icon line {
-  stroke-dasharray: 30;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 0.3s ease;
-}
-
-.eye-icon.eye-closed line {
-  stroke-dashoffset: 30;
-}
-
-/* Adjust password input padding for the toggle button */
-.form-group input[type="password"],
-.form-group input[type="text"] {
-  padding-right: 45px;
-}
-
-/* Password reveal animation */
-.password-reveal {
-  display: inline-block;
-  opacity: 0;
-  animation: revealText 0.05s ease forwards;
-  background: transparent;
-}
-
-@keyframes revealText {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Ensure password input maintains dark background when type changes */
-.form-group input[type="text"],
-.form-group input[type="password"] {
-  background: rgba(0, 0, 0, 0.7) !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
-}
-
-.form-group input[type="text"]:focus,
-.form-group input[type="password"]:focus {
-  background: rgba(0, 0, 0, 0.8);
-}
-
-/* Remove any background from the password reveal container */
-.form-group div[style*="position: absolute"] {
-  background: transparent !important;
-  mix-blend-mode: normal;
+  width: 20px;
+  height: 20px;
 }
 
 /* Attendance status indicators */

@@ -1,0 +1,284 @@
+/* Timetable download view styles */
+.timetable-download {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 12px;
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 100px repeat(10, 1fr);
+  gap: 2px;
+  min-width: 1200px;
+}
+
+.time-slot {
+  background: #2a2a2a;
+  color: #ffffff;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-label {
+  background: #2d3748;
+  font-weight: 600;
+}
+
+.subject-cell {
+  padding: 12px 10px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-radius: 4px;
+}
+
+.subject-cell.theory {
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.subject-cell.practical {
+  background: rgba(40, 167, 69, 0.15);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.subject-cell.online {
+  background: rgba(13, 202, 240, 0.15);
+  border: 1px solid rgba(13, 202, 240, 0.3);
+}
+
+.subject-cell.empty {
+  background: rgba(33, 37, 41, 0.3);
+  border: 1px solid rgba(33, 37, 41, 0.1);
+}
+
+.subject-name {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.subject-code {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+}
+
+/* Download button styles */
+.download-button {
+  background: linear-gradient(45deg, #3636e3, #5454ff);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-button:hover {
+  background: linear-gradient(45deg, #4646f3, #6464ff);
+  transform: translateY(-1px);
+}
+
+.download-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Add these styles to your existing Timetable.css */
+
+.timetable-container {
+  padding: 20px;
+  width: 100%;
+}
+
+.timetable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.timetable-header h2 {
+  color: #ffffff;
+  font-size: 24px;
+  margin: 0;
+}
+
+.timetable-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-button {
+  background: linear-gradient(45deg, #2d3748, #4a5568);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-button:hover {
+  background: linear-gradient(45deg, #4a5568, #2d3748);
+  transform: translateY(-1px);
+}
+
+/* Edit mode styles */
+.subject-cell.editable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subject-cell.editable:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.cell-edit-input {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #ffffff;
+  padding: 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.cell-edit-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.action-button.active {
+  background: linear-gradient(45deg, #3636e3, #5454ff);
+}
+
+/* Highlight custom entries */
+.subject-cell.custom {
+  background: rgba(147, 51, 234, 0.15);
+  border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+/* Calendar styles */
+.calendar-container {
+  background: #2a2a2a;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.calendar-container input[type="date"] {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  width: 200px;
+}
+
+.event-input {
+  margin-bottom: 20px;
+}
+
+.event-input input[type="text"] {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.event-input small {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.event-input small.warning {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.events-list {
+  margin-top: 20px;
+}
+
+.events-list h3 {
+  color: #ffffff;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.event-item span:first-child {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  min-width: 100px;
+}
+
+.event-item span:nth-child(2) {
+  color: #ffffff;
+  flex: 1;
+}
+
+.delete-event {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.delete-event:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Event cell styles */
+.subject-cell.event {
+  background: rgba(236, 72, 153, 0.15);
+  border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.subject-cell.event .subject-name {
+  color: #f9a8d4;
+}
+
+.subject-cell.event .subject-code {
+  color: rgba(249, 168, 212, 0.6);
+} 

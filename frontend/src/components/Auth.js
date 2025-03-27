@@ -208,7 +208,7 @@ const Auth = () => {
       chars.forEach((_, index) => {
         setTimeout(() => {
           setRevealedChars(prev => [...prev, index])
-        }, index * 50) // Changed from 200ms to 50ms (0.05 seconds)
+        }, index * 30) // 0.03 second (30ms) delay between each character
       })
     } else {
       // When hiding password, reset immediately
@@ -252,14 +252,14 @@ const Auth = () => {
             <div className="form-group">
               <input
                 id="password"
-                name="password"
                 type={showPassword ? "text" : "password"}
                 required
                 placeholder=" "
-                value={password}
+                value={!showPassword ? password : ''}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setActiveInput('password')}
                 onBlur={() => setActiveInput(null)}
+                className="password-input"
               />
               <label htmlFor="password">Password</label>
               <button
@@ -287,18 +287,10 @@ const Auth = () => {
                 </svg>
               </button>
               {showPassword && (
-                <div style={{ 
-                  position: 'absolute', 
-                  top: 0, 
-                  left: 0, 
-                  pointerEvents: 'none', 
-                  padding: '15px 18px',
-                  background: 'transparent' 
-                }}>
+                <div className="password-reveal-text">
                   {password.split('').map((char, index) => (
                     <span
                       key={index}
-                      className={revealedChars.includes(index) ? 'password-reveal' : ''}
                       style={{ 
                         visibility: revealedChars.includes(index) ? 'visible' : 'hidden',
                         color: '#ffffff'

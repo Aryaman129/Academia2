@@ -1,11 +1,11 @@
 {
   "short_name": "Acadia",
-  "name": "Acadia Student Portal",
+  "name": "Acadia - Academic Assistant",
   "icons": [
     {
       "src": "acadia-logo.png",
-      "type": "image/png",
-      "sizes": "64x64"
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
     },
     {
       "src": "acadia-logo.png",
@@ -21,6 +21,6 @@
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#000000",
-  "background_color": "#0D1117",
+  "background_color": "#1a1a1a",
   "orientation": "portrait"
 } 

@@ -2,121 +2,156 @@ import React, { useState, useEffect } from 'react';
 
 const RefreshButton = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [status, setStatus] = useState({
-    lastUpdate: null,
-    message: ''
-  });
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  const refreshData = async () => {
-    setIsRefreshing(true);
-    setStatus({ ...status, message: 'Starting refresh...' });
-    
+  const checkStatus = async () => {
     try {
       const token = localStorage.getItem('token');
-      await fetch('/api/refresh-data', {
+      const response = await fetch('https://academia2-1.onrender.com/api/refresh-status', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setLastUpdate({
+          attendance: data.attendance_last_update,
+          marks: data.marks_last_update
+        });
+      } else {
+        console.error('Status check failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Error checking status:', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('https://academia2-1.onrender.com/api/refresh-data', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      setStatus({ ...status, message: 'Fetching new data...' });
-      // Check status every 2 seconds
-      const statusCheck = setInterval(async () => {
-        const updated = await checkStatus();
-        if (updated) {
-          clearInterval(statusCheck);
-          setIsRefreshing(false);
-          setStatus({ 
-            lastUpdate: updated.attendance_last_update,
-            message: '✅ Data updated successfully!'
-          });
-        }
-      }, 2000);
-      
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        clearInterval(statusCheck);
+      // Wait a bit for data to update
+      setTimeout(async () => {
+        await checkStatus();
         setIsRefreshing(false);
-        setStatus({ 
-          ...status, 
-          message: 'Update took too long, please try again' 
-        });
-      }, 30000);
+      }, 5000);
       
     } catch (error) {
       console.error('Refresh failed:', error);
       setIsRefreshing(false);
-      setStatus({ ...status, message: '❌ Update failed, please try again' });
     }
   };
 
-  const checkStatus = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/refresh-status', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Status check failed:', error);
-      return null;
-    }
-  };
-
-  // Check last update time
-  const checkLastUpdate = async () => {
-    const token = localStorage.getItem('token');
-    const response = await fetch('/api/refresh-status', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    const data = await response.json();
-    
-    if (data.success) {
-      setLastUpdate({
-        attendance: new Date(data.attendance_last_update).toLocaleString(),
-        marks: new Date(data.marks_last_update).toLocaleString()
-      });
-    }
-  };
+  // Check status when component mounts
+  useEffect(() => {
+    checkStatus();
+  }, []);
 
   return (
     <div className="refresh-container">
       <button 
-        onClick={refreshData} 
+        onClick={handleRefresh}
         disabled={isRefreshing}
         className={`refresh-button ${isRefreshing ? 'refreshing' : ''}`}
       >
         {isRefreshing ? '🔄 Updating...' : '🔄 Refresh Data'}
       </button>
       
-      {status.message && (
-        <div className="status-message">
-          {status.message}
-        </div>
-      )}
-      
-      {status.lastUpdate && (
-        <div className="last-update">
-          Last updated: {new Date(status.lastUpdate).toLocaleString()}
+      {lastUpdate && (
+        <div className="last-update-container">
+          <div className="update-item">
+            <span className="update-label">Attendance:</span>
+            <span className="update-time">
+              {lastUpdate.attendance ? new Date(lastUpdate.attendance).toLocaleString() : 'Not updated'}
+            </span>
+          </div>
+          <div className="update-item">
+            <span className="update-label">Marks:</span>
+            <span className="update-time">
+              {lastUpdate.marks ? new Date(lastUpdate.marks).toLocaleString() : 'Not updated'}
+            </span>
+          </div>
         </div>
       )}
 
-      {lastUpdate && (
-        <div>
-          <p>Last Attendance Update: {lastUpdate.attendance}</p>
-          <p>Last Marks Update: {lastUpdate.marks}</p>
-        </div>
-      )}
+      <style jsx>{`
+        .refresh-container {
+          padding: 15px;
+          border-radius: 8px;
+          background: #f5f5f5;
+          margin: 10px;
+        }
+
+        .refresh-button {
+          width: 100%;
+          padding: 12px;
+          border-radius: 8px;
+          border: none;
+          background: #007bff;
+          color: white;
+          font-size: 16px;
+          cursor: pointer;
+          margin-bottom: 15px;
+        }
+
+        .refresh-button:disabled {
+          background: #ccc;
+        }
+
+        .last-update-container {
+          background: white;
+          border-radius: 8px;
+          padding: 10px;
+          margin-top: 10px;
+        }
+
+        .update-item {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid #eee;
+        }
+
+        .update-item:last-child {
+          border-bottom: none;
+        }
+
+        .update-label {
+          font-weight: bold;
+          color: #666;
+        }
+
+        .update-time {
+          color: #333;
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+          .refresh-container {
+            padding: 10px;
+            margin: 5px;
+          }
+
+          .update-item {
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .update-time {
+            font-size: 14px;
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
-// Add some basic styles
-const styles = `
+export default RefreshButton;

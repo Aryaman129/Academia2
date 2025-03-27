@@ -473,18 +473,34 @@ def get_refresh_status():
         token = auth_header.split(' ')[1]
         email = verify_token(token)
         
-        # Get last update times from both tables
-        attendance_data = supabase.table('attendance').select('updated_at').eq('user_id', email).execute()
-        marks_data = supabase.table('marks').select('updated_at').eq('user_id', email).execute()
+        # FIXED: Get user_id first
+        user_query = supabase.table("users").select("id").eq("email", email).execute()
+        if not user_query.data:
+            return jsonify({'error': 'User not found'}), 404
+            
+        user_id = user_query.data[0]['id']
+        
+        # FIXED: Use correct table structure
+        attendance_data = supabase.table('attendance')\
+            .select('attendance_data,updated_at')\
+            .eq('user_id', user_id)\
+            .execute()
+            
+        marks_data = supabase.table('marks')\
+            .select('marks_data,updated_at')\
+            .eq('user_id', user_id)\
+            .execute()
         
         return jsonify({
             'success': True,
             'attendance_last_update': attendance_data.data[0]['updated_at'] if attendance_data.data else None,
-            'marks_last_update': marks_data.data[0]['updated_at'] if marks_data.data else None
+            'marks_last_update': marks_data.data[0]['updated_at'] if marks_data.data else None,
+            'has_data': bool(attendance_data.data and marks_data.data)
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        print(f"Refresh status error: {str(e)}")  # Add logging
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/quick-login', methods=['POST'])
 def quick_login():
