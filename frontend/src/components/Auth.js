@@ -7,7 +7,9 @@ import "./Auth.css" // We'll create this file next
 
 // Create axios instance with proper config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5050",
+  baseURL: process.env.NODE_ENV === 'development' 
+    ? process.env.REACT_APP_LOCAL_API_URL 
+    : process.env.REACT_APP_API_URL,
   timeout: 60000,
   headers: {
     "Content-Type": "application/json",

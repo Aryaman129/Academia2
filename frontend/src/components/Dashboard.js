@@ -7,7 +7,9 @@ import './Dashboard.css';
 import AttendancePredictionModal from './AttendancePredictionModal';
 import { CALENDAR_DATA } from '../data/calendar';
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5050"
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? process.env.REACT_APP_LOCAL_API_URL 
+  : process.env.REACT_APP_API_URL
 
 const Dashboard = () => {
   // State management
