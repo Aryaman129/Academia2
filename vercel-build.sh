@@ -3,49 +3,56 @@ set -e
 
 echo "Starting custom build process..."
 
-# Copy Vercel-specific .npmrc file to home directory
-echo "Setting up npmrc configuration"
-cp .npmrc-vercel ~/.npmrc
+# Create a completely clean install environment
+echo "Setting up environment variables"
+export PHANTOMJS_SKIP_DOWNLOAD=true
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+export SKIP_PREFLIGHT_CHECK=true
+export NODE_OPTIONS="--max-old-space-size=4096"
+export npm_config_ignore_scripts=true
 
-# Create a "nothing" package to use as a substitute for PhantomJS
-mkdir -p node_modules/@npm/nothing
-cat > node_modules/@npm/nothing/package.json << EOL
+# Create a temporary minimal package.json for installation
+cd frontend
+echo "Creating minimal package.json for clean installation"
+cat > package.json.minimal << EOL
 {
-  "name": "@npm/nothing",
-  "version": "1.0.0",
-  "description": "Empty package",
-  "main": "index.js"
+  "name": "acadia-temp",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {},
+  "scripts": {
+    "build": "react-scripts build"
+  }
 }
 EOL
-echo "module.exports = {};" > node_modules/@npm/nothing/index.js
 
-# Force npm to use the "nothing" package
-cat >> ~/.npmrc << EOL
+# Backup original package.json
+cp package.json package.json.orig
 
-phantomjs=@npm/nothing
-phantomjs-prebuilt=@npm/nothing
-EOL
+# Use the minimal version for installation
+mv package.json.minimal package.json
 
-# Create an explicit installation hint file
-echo "process.env.PHANTOMJS_SKIP_DOWNLOAD = 'true';" > install-hint.js
+# Install dependencies one by one, without any install scripts
+echo "Installing core dependencies"
+npm install --no-package-lock --no-save --ignore-scripts react react-dom react-scripts react-router-dom
 
-# Install dependencies with special flags
-cd frontend 
-echo "Installing frontend dependencies"
-PHANTOMJS_SKIP_DOWNLOAD=true npm install --no-optional --no-package-lock --no-fund
+echo "Installing remaining dependencies"
+npm install --no-package-lock --no-save --ignore-scripts @supabase/supabase-js axios tailwindcss
+npm install --no-package-lock --no-save --ignore-scripts @testing-library/jest-dom @testing-library/react @testing-library/user-event
+npm install --no-package-lock --no-save --ignore-scripts web-vitals jspdf
 
-# Run our removal script to clean up any PhantomJS installations
-echo "Running PhantomJS removal script"
-cd ..
-node remove-phantom.js
+echo "Installing dev dependencies"
+npm install --no-package-lock --no-save --ignore-scripts --save-dev crypto-browserify
 
-# Generate assets
-echo "Generating assets"
-cd frontend
-npm run prepare-assets
+# Restore original package.json
+mv package.json.orig package.json
+
+# Generate assets directly using Node
+echo "Generating assets directly"
+node generate-assets.js
 
 # Build the application
 echo "Building application"
-SKIP_PREFLIGHT_CHECK=true PHANTOMJS_SKIP_DOWNLOAD=true npm run build
+npx react-scripts build
 
 echo "Build completed successfully!" 

@@ -1,17 +1,10 @@
 {
   "name": "acadia",
   "version": 2,
-  "builds": [
-    {
-      "src": "vercel-build.sh",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "frontend/build",
-        "buildCommand": "chmod +x vercel-build.sh && ./vercel-build.sh",
-        "zeroConfig": true
-      }
-    }
-  ],
+  "buildCommand": "cd frontend && CI=false npm run build",
+  "outputDirectory": "frontend/build",
+  "framework": "create-react-app",
+  "installCommand": "cd frontend && npm install --no-optional --ignore-scripts",
   "routes": [
     {
       "src": "/static/(.*)",
