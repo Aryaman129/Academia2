@@ -6,7 +6,7 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "cd frontend && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true PHANTOMJS_SKIP_DOWNLOAD=true npm install && npm run prepare-assets && npm run build",
+        "buildCommand": "cd frontend && cp .npmrc ~/.npmrc && npm install --no-optional && node deploy-fix.js && npm run prepare-assets && npm run build",
         "distDir": "build"
       }
     }
