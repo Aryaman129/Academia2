@@ -229,10 +229,11 @@ const Auth = () => {
       <div className="login-card-container">
         <div className="login-card">
           <h1>Acadia Student Portal</h1>
-          <p>(Testing Version)</p>
+          <p className="version-text">(Testing Version)</p>
 
           <form className="login-form" onSubmit={handleLogin}>
             <div className="form-group">
+              <label htmlFor="email" className="floating-label">Email address</label>
               <div className="email-input-wrapper">
                 <input
                   id="email"
@@ -245,7 +246,6 @@ const Auth = () => {
                   onBlur={() => setActiveInput(null)}
                 />
                 <span className="email-suffix">{emailSuffix}</span>
-                <label htmlFor="email">Email address</label>
               </div>
             </div>
 

@@ -142,13 +142,12 @@
 
 .form-group label {
   position: absolute;
-  left: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: rgba(200, 200, 220, 0.7);
+  left: 0;
+  top: -20px;
+  color: #4d9fff;
+  font-size: 14px;
+  font-weight: 500;
   transition: all 0.3s ease;
-  pointer-events: none;
-  font-size: 16px;
 }
 
 .form-group input:focus + label,
@@ -543,15 +542,26 @@
 .email-input-wrapper {
   position: relative;
   width: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 12px;
+  border: 1px solid rgba(70, 70, 90, 0.3);
 }
 
 .email-input-wrapper input {
   width: 100%;
-  padding-right: 140px !important; /* Increased space for suffix */
+  padding: 15px 18px;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
   font-family: monospace;
   letter-spacing: 0.5px;
-  font-size: 16px;
   font-weight: 500;
+  padding-right: 140px !important; /* Make room for suffix */
+}
+
+.email-input-wrapper input:focus {
+  outline: none;
 }
 
 .email-suffix {
@@ -566,24 +576,21 @@
   font-family: monospace;
   letter-spacing: 0.5px;
   font-weight: 500;
-  background: transparent;
 }
 
-/* Ensure the label doesn't overlap with the suffix */
-.email-input-wrapper label {
-  background: transparent;
-  padding: 0 5px;
-  font-weight: 500;
+/* Version text styling */
+.version-text {
+  color: #ffd700;
+  font-size: 14px;
+  margin-bottom: 30px;
 }
 
-/* When input is focused or has value */
-.email-input-wrapper input:focus ~ .email-suffix,
-.email-input-wrapper input:not(:placeholder-shown) ~ .email-suffix {
+/* Input focus effects */
+.email-input-wrapper:focus-within {
+  border-color: #4d4dff;
+  box-shadow: 0 0 0 3px rgba(77, 77, 255, 0.2);
+}
+
+.form-group input:focus ~ .email-suffix {
   color: rgba(255, 255, 255, 0.8);
-}
-
-.email-input-wrapper input:focus ~ label,
-.email-input-wrapper input:not(:placeholder-shown) ~ label {
-  color: #4d4dff;
-  font-weight: 600;
 } 

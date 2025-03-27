@@ -496,27 +496,37 @@ const Dashboard = () => {
               );
 
               return (
-                <div key={index} className="attendance-card p-4 rounded-lg bg-gray-800 shadow-lg">
+                <div key={index} className="attendance-card p-4 rounded-lg bg-gray-800/50 shadow-lg backdrop-blur-sm">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{record.course_title}</h3>
-                      <div className="text-sm text-gray-400">{record.course_code}</div>
-                      <div className={`text-sm ${record.category === 'Theory' ? 'text-blue-400' : 'text-green-400'}`}>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium text-gray-100">{record.course_title}</h3>
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        record.category === 'Theory' 
+                          ? 'bg-amber-500/20 text-amber-300' 
+                          : 'bg-emerald-500/20 text-emerald-300'
+                      }`}>
                         {record.category}
-                      </div>
+                      </span>
                     </div>
                     <div className="text-right">
-                      <div className={`text-lg font-bold ${attendanceInfo.colorClass}`}>
+                      <div className={`text-lg font-bold ${
+                        parseFloat(attendanceInfo.percentage) >= 75
+                          ? "text-emerald-400"
+                          : parseFloat(attendanceInfo.percentage) >= 70
+                            ? "text-amber-400"
+                            : "text-rose-400"
+                      }`}>
                         {attendanceInfo.percentage}%
                       </div>
-                      <div className={`text-sm font-medium ${attendanceInfo.messageClass}`}>
+                      <div className={`text-sm ${
+                        parseFloat(attendanceInfo.percentage) >= 75
+                          ? "text-sky-400"
+                          : "text-rose-400"
+                      }`}>
                         {attendanceInfo.message}
                       </div>
                       <div className="text-sm text-gray-400">
                         {record.hours_conducted - record.hours_absent} / {record.hours_conducted}
-                        <span className="text-red-400 ml-2">
-                          ({record.hours_absent} missed)
-                        </span>
                       </div>
                     </div>
                   </div>
