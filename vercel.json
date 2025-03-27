@@ -1,10 +1,16 @@
 {
   "name": "acadia",
   "version": 2,
-  "buildCommand": "cd frontend && CI=false npm run build",
-  "outputDirectory": "frontend/build",
-  "framework": "create-react-app",
-  "installCommand": "cd frontend && npm install --no-optional --ignore-scripts",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build",
+        "buildCommand": "npm install --no-optional --ignore-scripts && CI=false npm run build"
+      }
+    }
+  ],
   "routes": [
     {
       "src": "/static/(.*)",

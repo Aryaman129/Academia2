@@ -12,6 +12,9 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
+import boto3
+import requests
+import random
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -590,6 +593,45 @@ def start_scraper():
         
         threading.Thread(target=refresh_attendance, daemon=True).start()
         return jsonify({'status': 'started'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/trigger-scraper', methods=['POST'])
+def trigger_scraper():
+    try:
+        auth_header = request.headers.get('Authorization')
+        token = auth_header.split(' ')[1]
+        email = verify_token(token)
+        
+        # Get stored cookies
+        stored_data = supabase.table('user_cookies').select('*').eq('email', email).execute()
+        cookies = stored_data.data[0].get('cookies', {})
+        
+        # Load balancing across multiple scraper instances
+        scraper_instances = [
+            'http://scraper1:5000/scrape',
+            'http://scraper2:5000/scrape',
+            'http://scraper3:5000/scrape'
+        ]
+        
+        # Simple round-robin
+        instance = random.choice(scraper_instances)
+        
+        # Call scraper service
+        response = requests.post(
+            instance,
+            json={
+                'email': email,
+                'cookies': cookies
+            },
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            return jsonify({'success': True, 'message': 'Scraper triggered'})
+        else:
+            return jsonify({'error': 'Failed to trigger scraper'}), 500
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500 
