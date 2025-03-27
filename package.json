@@ -7,7 +7,6 @@
   ],
   "scripts": {
     "build": "cd frontend && npm run build",
-    "start": "cd frontend && npm start",
-    "preinstall": "echo 'Setting npm config for PhantomJS' && npm config set phantomjs_cdnurl=http://cnpmjs.org/downloads && npm config set puppeteer_skip_chromium_download=true && npm config set phantomjs_skip_download=true"
+    "start": "cd frontend && npm start"
   }
 } 
