@@ -1,8 +1,21 @@
 import axios from 'axios';
 
+// Ensure API URL is absolute and includes protocol
+const getApiUrl = () => {
+  let apiUrl = process.env.REACT_APP_API_URL || '';
+  
+  // Add protocol if missing
+  if (apiUrl && !apiUrl.startsWith('http')) {
+    apiUrl = `https://${apiUrl}`;
+  }
+  
+  console.log('Final API URL:', apiUrl);
+  return apiUrl;
+};
+
 // Create a base axios instance with the API URL from environment
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_URL,
+  baseURL: getApiUrl(),
   timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'application/json',
