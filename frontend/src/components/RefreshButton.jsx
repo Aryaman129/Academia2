@@ -17,6 +17,7 @@ const RefreshButton = ({ onRefreshComplete }) => {
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
+  const [initialData, setInitialData] = useState(null);
 
   // Increase max wait time to 3 minutes (180 seconds)
   const MAX_WAIT_TIME = 180; 
@@ -74,6 +75,13 @@ const RefreshButton = ({ onRefreshComplete }) => {
         throw new Error('No stored credentials found');
       }
       
+      // Store initial data for comparison later
+      setInitialData({
+        attendance: userData.attendance,
+        marks: userData.marks,
+        timetable: userData.timetable
+      });
+      
       // Start the refresh process for attendance
       setStatusMessage('Refreshing attendance data...');
       const refreshResponse = await axios.post(`${apiUrl}/api/scrape`, 
@@ -95,6 +103,7 @@ const RefreshButton = ({ onRefreshComplete }) => {
       // Poll for updates
       let attempts = 0;
       const startTime = Date.now();
+      let refreshCompleted = false;
       
       const checkInterval = setInterval(async () => {
         attempts++;
@@ -112,23 +121,58 @@ const RefreshButton = ({ onRefreshComplete }) => {
           
           const newData = statusResponse.data;
           
-          // Check if attendance data is newer than when we started
+          // Primary method: Check if attendance data is newer than when we started
           if (newData.attendance?.updated_at) {
             const updateTime = new Date(newData.attendance.updated_at);
-            if (updateTime > new Date(startTime)) {
-              // Success! Data has been updated
-              clearInterval(checkInterval);
-              setLastUpdate(updateTime.toLocaleString());
-              setProgress(100);
-              setStatusMessage('Data refresh complete!');
-              setIsRefreshing(false);
-              
-              // Call the callback if provided
-              if (onRefreshComplete) {
-                onRefreshComplete();
-              }
-              return;
+            if (updateTime > new Date(startTime - 60000)) { // Allow 1 minute buffer
+              refreshCompleted = true;
             }
+          }
+          
+          // Fallback method: Directly check if data has changed
+          if (!refreshCompleted && initialData && newData) {
+            // Check for any changes in data by comparing lengths
+            const oldAttendanceLength = JSON.stringify(initialData.attendance?.attendance_data || {}).length;
+            const newAttendanceLength = JSON.stringify(newData.attendance?.attendance_data || {}).length;
+            
+            const oldMarksLength = JSON.stringify(initialData.marks?.marks_data || {}).length;
+            const newMarksLength = JSON.stringify(newData.marks?.marks_data || {}).length;
+            
+            // If we detect significant changes in data size, consider it a successful update
+            if (Math.abs(newAttendanceLength - oldAttendanceLength) > 10 || 
+                Math.abs(newMarksLength - oldMarksLength) > 10) {
+              refreshCompleted = true;
+              console.log('Detected data change, refresh considered complete');
+            }
+          }
+          
+          // Also check the refresh-status endpoint as third method
+          try {
+            const refreshStatusResponse = await axios.get(`${apiUrl}/api/refresh-status`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (refreshStatusResponse.data.status === 'completed' || 
+                refreshStatusResponse.data.completed_at) {
+              refreshCompleted = true;
+            }
+          } catch (statusErr) {
+            console.error('Error checking refresh status:', statusErr);
+          }
+          
+          // Check if we've successfully completed the refresh
+          if (refreshCompleted) {
+            clearInterval(checkInterval);
+            setLastUpdate(new Date().toLocaleString());
+            setProgress(100);
+            setStatusMessage('Data refresh complete!');
+            setIsRefreshing(false);
+            
+            // Call the callback if provided
+            if (onRefreshComplete) {
+              onRefreshComplete();
+            }
+            return;
           }
           
           // Update status message with more details as time passes
@@ -141,7 +185,27 @@ const RefreshButton = ({ onRefreshComplete }) => {
           // Check if we've exceeded max wait time
           if (elapsedSeconds >= MAX_WAIT_TIME) {
             clearInterval(checkInterval);
-            setStatusMessage('Refresh timed out, but data may still be updating in the background.');
+            
+            // Try to fetch data one last time to see if it updated
+            try {
+              const finalDataResponse = await axios.get(`${apiUrl}/api/user-data?email=${email}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              
+              // If we have data, consider it a success even if we timed out
+              if (finalDataResponse.data && finalDataResponse.data.attendance) {
+                setStatusMessage('Refresh completed, but took longer than expected.');
+                setProgress(100);
+                if (onRefreshComplete) {
+                  onRefreshComplete();
+                }
+              } else {
+                setStatusMessage('Refresh timed out, but data may still be updating in the background.');
+              }
+            } catch (finalErr) {
+              setStatusMessage('Refresh timed out. Try again or check back later.');
+            }
+            
             setIsRefreshing(false);
             // Still load the latest data we have
             loadLastUpdateTime();

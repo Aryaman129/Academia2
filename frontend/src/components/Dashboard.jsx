@@ -19,8 +19,9 @@ const Dashboard = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
   
-  const fetchUserData = async () => {
+  const fetchUserData = async (forceReload = false) => {
     try {
       setLoading(true);
       setError(null);
@@ -33,11 +34,14 @@ const Dashboard = () => {
       }
       
       const apiUrl = getApiUrl();
-      const response = await axios.get(`${apiUrl}/api/user-data?email=${email}`, {
+      // Add a cache-busting parameter when forced reload is requested
+      const cacheParam = forceReload ? `?t=${Date.now()}` : '';
+      const response = await axios.get(`${apiUrl}/api/user-data?email=${email}${cacheParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       setUserData(response.data);
+      setLastRefreshTime(new Date());
     } catch (err) {
       console.error('Error fetching user data:', err);
       setError(err.message || 'Failed to load data');
@@ -53,8 +57,13 @@ const Dashboard = () => {
   
   // Handler for refresh button completion
   const handleRefreshComplete = () => {
-    // Refresh the user data to show the latest
-    fetchUserData();
+    // Refresh the user data to show the latest with forced cache reload
+    fetchUserData(true);
+  };
+  
+  // Handler for manual data reload as fallback
+  const handleManualReload = () => {
+    fetchUserData(true);
   };
 
   return (
@@ -66,12 +75,27 @@ const Dashboard = () => {
       
       <div className="refresh-section">
         <RefreshButton onRefreshComplete={handleRefreshComplete} />
+        {lastRefreshTime && (
+          <p className="last-reload">
+            Data loaded: {lastRefreshTime.toLocaleTimeString()} 
+            <button 
+              onClick={handleManualReload} 
+              className="manual-reload-btn"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : 'Reload Now'}
+            </button>
+          </p>
+        )}
       </div>
       
       {loading ? (
         <div className="loading-indicator">Loading your data...</div>
       ) : error ? (
-        <div className="error-message">{error}</div>
+        <div className="error-message">
+          {error}
+          <button onClick={handleManualReload} className="retry-btn">Try Again</button>
+        </div>
       ) : (
         <div className="dashboard-content">
           <div className="dashboard-section">

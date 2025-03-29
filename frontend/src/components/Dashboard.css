@@ -130,6 +130,32 @@
       background-color: #472726;
       color: #e57373;
     }
+    
+    .last-reload {
+      color: #aaa;
+    }
+    
+    .manual-reload-btn {
+      border-color: #3a76d8;
+      color: #3a76d8;
+    }
+    
+    .manual-reload-btn:hover {
+      background-color: #3a76d8;
+    }
+    
+    .manual-reload-btn:disabled {
+      border-color: #555;
+      color: #777;
+    }
+    
+    .retry-btn {
+      background-color: #c0392b;
+    }
+    
+    .retry-btn:hover {
+      background-color: #a02c1d;
+    }
   }
   
   .header-content {
@@ -411,6 +437,52 @@
   @keyframes spinner {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  
+  .last-reload {
+    font-size: 12px;
+    color: #777;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+  }
+  
+  .manual-reload-btn {
+    background-color: transparent;
+    border: 1px solid #4a86e8;
+    color: #4a86e8;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .manual-reload-btn:hover {
+    background-color: #4a86e8;
+    color: white;
+  }
+  
+  .manual-reload-btn:disabled {
+    border-color: #ccc;
+    color: #999;
+    cursor: not-allowed;
+  }
+  
+  .retry-btn {
+    margin-left: 15px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .retry-btn:hover {
+    background-color: #c0392b;
   }
   
   
