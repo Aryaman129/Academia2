@@ -145,16 +145,36 @@ const Auth = () => {
       if (!email || !password) {
         throw new Error("Email and password are required")
       }
+      
+      const fullEmail = getFullEmail();
+      
+      console.log("Login attempt with:", { email: fullEmail });
   
-      const response = await api.post("/api/login", { email: getFullEmail(), password })
+      const response = await api.post("/api/login", { 
+        email: fullEmail, 
+        password 
+      });
+  
+      // Check if response or response.data is undefined
+      if (!response || !response.data) {
+        throw new Error("Invalid server response");
+      }
   
       if (!response.data.success) {
         throw new Error(response.data.error || "Login failed")
       }
   
+      // Check if token and user exist before using them
+      if (!response.data.token) {
+        throw new Error("No authorization token received");
+      }
+  
+      // Safe access to user data
+      const userData = response.data.user || {};
+  
       localStorage.setItem("token", response.data.token)
-      localStorage.setItem("userEmail", response.data.user.email)
-      localStorage.setItem("userId", response.data.user.id)
+      localStorage.setItem("userEmail", userData.email || fullEmail)
+      localStorage.setItem("userId", userData.id || "")
   
       // Start polling for scraper status
       let statusChecks = 0
@@ -175,12 +195,15 @@ const Auth = () => {
             headers: { Authorization: `Bearer ${response.data.token}` },
           })
           
-          if (statusResponse.data.status.status === "completed") {
+          // Safe object access
+          const status = statusResponse?.data?.status?.status;
+          
+          if (status === "completed") {
             // If scraping is complete, navigate to dashboard
             setTimeout(() => {
               navigate("/dashboard")
             }, 500)
-          } else if (statusResponse.data.status.status === "failed") {
+          } else if (status === "failed") {
             // If scraping failed but login succeeded, still navigate
             setTimeout(() => {
               navigate("/dashboard")
@@ -190,6 +213,7 @@ const Auth = () => {
             setTimeout(checkStatus, 2000)
           }
         } catch (error) {
+          console.error("Status check error:", error);
           // If there's an error checking status, just navigate
           setTimeout(() => {
             navigate("/dashboard")
