@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { CALENDAR_DATA } from '../data/calendar';
 
-const AttendancePredictionModal = ({ 
-  isOpen, 
-  onClose, 
-  attendanceData, 
-  timetableData 
+const AttendancePredictionModal = ({
+  isOpen,
+  onClose,
+  attendanceData,
+  timetableData
 }) => {
   const [selectedDates, setSelectedDates] = useState([]);
   const [predictions, setPredictions] = useState([]);
@@ -19,7 +19,7 @@ const AttendancePredictionModal = ({
     const today = new Date();
     const monthName = today.toLocaleString('default', { month: 'long' }).toUpperCase();
     const year = today.getFullYear().toString();
-    
+
     // Find current month in calendar data
     const monthData = CALENDAR_DATA.find(
       m => m.month === monthName && m.year === year
@@ -28,7 +28,7 @@ const AttendancePredictionModal = ({
     if (!monthData) return null;
 
     // Find today's data
-    const dayData = monthData.days.find(day => 
+    const dayData = monthData.days.find(day =>
       day.date === today.getDate()
     );
 
@@ -46,11 +46,11 @@ const AttendancePredictionModal = ({
     if (isOpen) {
       // Initialize calendar data
       setCalendarData(CALENDAR_DATA);
-      
+
       // Get unique months from the calendar data
       const months = CALENDAR_DATA.map(month => `${month.month} ${month.year}`);
       setAvailableMonths(months);
-      
+
       // Set current month to today's month if available, otherwise first month
       const today = new Date();
       const currentMonthStr = `${today.toLocaleString('default', { month: 'long' }).toUpperCase()} ${today.getFullYear()}`;
@@ -59,7 +59,7 @@ const AttendancePredictionModal = ({
       } else if (months.length > 0) {
         setCurrentMonth(months[0]);
       }
-      
+
       // Set today's info
       setTodayInfo(getTodayInfo());
     }
@@ -68,12 +68,12 @@ const AttendancePredictionModal = ({
   const getMonthData = (monthYear) => {
     if (!monthYear) return [];
     const [targetMonth, targetYear] = monthYear.split(' ');
-    
+
     // Find the month data
     const monthData = CALENDAR_DATA.find(
       m => m.month === targetMonth && m.year === targetYear
     );
-    
+
     if (!monthData) return [];
 
     // Convert the days data to the format we need
@@ -93,15 +93,13 @@ const AttendancePredictionModal = ({
     return firstDay.getDay();
   };
 
-  const getDaysInMonth = (monthYear) => {
-    if (!monthYear) return 0;
-    const [month, year] = monthYear.split(' ');
-    const lastDay = new Date(parseInt(year), new Date(`${month} 1`).getMonth() + 1, 0);
-    return lastDay.getDate();
-  };
+  // Removed unused function getDaysInMonth
 
   useEffect(() => {
     if (selectedDates.length > 0 && attendanceData) {
+      console.log('Attendance Data:', attendanceData);
+      console.log('Timetable Data:', timetableData);
+
       // Calculate predictions for each subject
       const newPredictions = attendanceData
         .filter(subject => subject.course_title.toLowerCase() !== 'course title')
@@ -109,6 +107,8 @@ const AttendancePredictionModal = ({
           const totalClasses = subject.hours_conducted;
           const presentClasses = totalClasses - subject.hours_absent;
           const currentPercentage = (presentClasses / totalClasses) * 100;
+
+          console.log(`Processing subject: ${subject.course_title} (${subject.is_lab ? 'Lab' : 'Theory'})`, subject);
 
           // Count affected classes for this subject on selected dates
           const affectedClasses = selectedDates.reduce((count, selectedDate) => {
@@ -122,28 +122,96 @@ const AttendancePredictionModal = ({
             if (!monthData) return count;
 
             // Find the day data
-            const dayData = monthData.days.find(day => 
+            const dayData = monthData.days.find(day =>
               day.date === selectedDate.getDate()
             );
 
             if (dayData && dayData.dayOrder !== null) {
               // Get all slots for this day order
               const daySlots = timetableData[`Day ${dayData.dayOrder}`] || {};
-              
+
+              // Debug the timetable structure for this day
+              if (dayData.dayOrder === 2 || dayData.dayOrder === 3) {
+                console.log(`Detailed timetable for Day ${dayData.dayOrder}:`, JSON.stringify(daySlots, null, 2));
+
+                // Check if there's a color property in the timetable data
+                Object.entries(daySlots).forEach(([slotKey, slot]) => {
+                  if (slot.courses) {
+                    slot.courses.forEach(course => {
+                      console.log(`Course in Day ${dayData.dayOrder}, Slot ${slotKey}:`, {
+                        title: course.title,
+                        type: course.type,
+                        color: course.color,
+                        bgColor: course.bgColor,
+                        allProperties: Object.keys(course)
+                      });
+                    });
+                  }
+                });
+              }
+
               // Count how many times this subject appears in this day's slots
-              const classesOnThisDay = Object.values(daySlots).reduce((slotCount, slot) => {
+              const classesOnThisDay = Object.entries(daySlots).reduce((slotCount, [slotKey, slot]) => {
                 if (!slot.courses) return slotCount;
-                
+
                 // Count matching courses in this slot
                 const matchingCourses = slot.courses.filter(course => {
                   const courseTitle = course.title.toLowerCase();
                   const subjectTitle = subject.course_title.toLowerCase();
-                  return courseTitle === subjectTitle;
+
+                  // Check if the course titles match
+                  if (courseTitle !== subjectTitle) {
+                    return false;
+                  }
+
+                  // Get course type and attendance category
+                  const courseType = course.type?.toLowerCase() || '';
+                  const isPractical = subject.category?.toLowerCase() === 'practical';
+
+                  // Check if this course is a practical/lab course
+                  const isCoursePractical = courseType.includes('practical') ||
+                                           courseType.includes('lab');
+
+                  // For lab-based theory courses, we need special handling
+                  const isLabBasedTheory = courseType.includes('lab based theory');
+
+                  // Matching logic
+                  let isMatch = false;
+
+                  // Get the original slot code from the slot data
+                  const originalSlot = slot.original_slot || '';
+
+                  // Check if this is a lab/practical slot based on the original_slot value
+                  // In the timetable, slots starting with 'P' are practical/lab slots
+                  const isLabSlot = originalSlot.startsWith('P');
+
+                  // Simple matching logic
+                  if (isPractical && isLabSlot) {
+                    // Match practical attendance with lab slots (starting with 'P')
+                    isMatch = true;
+                  } else if (!isPractical && !isLabSlot) {
+                    // Match theory attendance with theory slots (not starting with 'P')
+                    isMatch = true;
+                  }
+
+                  // Debug information
+                  console.log(`Course match for ${courseTitle}:`, {
+                    courseType,
+                    originalSlot,
+                    isLabSlot,
+                    isPractical,
+                    isCoursePractical,
+                    isLabBasedTheory,
+                    isMatch
+                  });
+
+                  return isMatch;
                 });
-                
+
                 return slotCount + matchingCourses.length;
               }, 0);
-              
+
+              console.log(`Day ${dayData.dayOrder} - Found ${classesOnThisDay} classes for ${subject.course_title}`);
               return count + classesOnThisDay;
             }
             return count;
@@ -206,7 +274,7 @@ const AttendancePredictionModal = ({
               </div>
             )}
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl"
           >
@@ -224,8 +292,8 @@ const AttendancePredictionModal = ({
                   key={month}
                   onClick={() => setCurrentMonth(month)}
                   className={`px-3 py-1 rounded text-sm ${
-                    currentMonth === month 
-                      ? 'bg-blue-500 text-white' 
+                    currentMonth === month
+                      ? 'bg-blue-500 text-white'
                       : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
                   }`}
                 >
@@ -234,7 +302,7 @@ const AttendancePredictionModal = ({
               ))}
             </div>
           </div>
-          
+
           <div className="grid grid-cols-7 gap-1 mb-2">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
               <div key={day} className="text-center text-xs text-gray-400 py-1 font-medium">
@@ -253,7 +321,7 @@ const AttendancePredictionModal = ({
             {currentMonthData.map((day, index) => {
               const isNonClassDay = day.dayOrder === null;
               const isSelected = selectedDates.some(d => d.toDateString() === day.date.toDateString());
-              
+
               return (
                 <button
                   key={`day-${index}`}
@@ -265,7 +333,7 @@ const AttendancePredictionModal = ({
                       }
                       return;
                     }
-                    setSelectedDates(prev => 
+                    setSelectedDates(prev =>
                       isSelected
                         ? prev.filter(d => d.toDateString() !== day.date.toDateString())
                         : [...prev, day.date]
@@ -274,10 +342,10 @@ const AttendancePredictionModal = ({
                   disabled={day.dayOrder === null && !day.holiday}
                   className={`
                     relative p-2 rounded text-center flex flex-col items-center justify-center min-h-[3rem]
-                    ${day.holiday 
-                      ? 'bg-yellow-800/30 text-yellow-200/70 cursor-pointer' 
-                      : isNonClassDay 
-                        ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed' 
+                    ${day.holiday
+                      ? 'bg-yellow-800/30 text-yellow-200/70 cursor-pointer'
+                      : isNonClassDay
+                        ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
                         : isSelected
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-700/50 text-gray-200 hover:bg-gray-600'}
@@ -316,7 +384,7 @@ const AttendancePredictionModal = ({
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-200 mb-2">Predictions:</h3>
             {predictions.map((prediction, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-[#2A2F36] rounded-lg p-4"
               >
@@ -368,4 +436,4 @@ const AttendancePredictionModal = ({
   );
 };
 
-export default AttendancePredictionModal; 
+export default AttendancePredictionModal;

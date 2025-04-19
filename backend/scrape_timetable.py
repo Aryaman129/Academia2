@@ -1,4 +1,4 @@
-''' import time
+import time
 import json
 import os
 import re
@@ -843,4 +843,4 @@ if __name__ == "__main__":
                     if slotinfo["original_slot"] and slotinfo["original_slot"] not in ["X", "-"]:
                         print(f"  {time_interval} => {slotinfo['original_slot']}")
                     else:
-                        print(f"  {time_interval} => Empty")'''
+                        print(f"  {time_interval} => Empty")

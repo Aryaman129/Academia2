@@ -7,9 +7,10 @@ import './Dashboard.css';
 import AttendancePredictionModal from './AttendancePredictionModal';
 import { CALENDAR_DATA } from '../data/calendar';
 import { jsPDF } from 'jspdf';
+import { useAuth } from '../contexts/AuthContext';
 
-const API_URL = process.env.NODE_ENV === 'development' 
-  ? process.env.REACT_APP_LOCAL_API_URL 
+const API_URL = process.env.NODE_ENV === 'development'
+  ? process.env.REACT_APP_LOCAL_API_URL
   : process.env.REACT_APP_API_URL;
 
 const Dashboard = () => {
@@ -33,19 +34,21 @@ const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [localEdits, setLocalEdits] = useState({});
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const timetableRef = useRef(null);
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshError, setRefreshError] = useState(null)
   const [refreshCooldown, setRefreshCooldown] = useState(false)
   const [cooldownTimer, setCooldownTimer] = useState(0)
+  const [notifications, setNotifications] = useState([])
 
   // Function to get today's day order from calendar
   const getTodayDayOrder = () => {
     const today = new Date();
     const monthName = today.toLocaleString('default', { month: 'long' }).toUpperCase();
     const year = today.getFullYear().toString();
-    
+
     // Find current month in calendar data
     const monthData = CALENDAR_DATA.find(
       m => m.month === monthName && m.year === year
@@ -54,7 +57,7 @@ const Dashboard = () => {
     if (!monthData) return null;
 
     // Find today's data
-    const dayData = monthData.days.find(day => 
+    const dayData = monthData.days.find(day =>
       day.date === today.getDate()
     );
 
@@ -77,7 +80,7 @@ const Dashboard = () => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000); // Update every second for more accurate time display
-    
+
     return () => clearInterval(timer);
   }, []);
 
@@ -97,21 +100,21 @@ const Dashboard = () => {
     const [startTime, endTime] = timeSlot.split("-").map(t => t.trim());
     const [startHour, startMinute] = startTime.split(":").map(Number);
     const [endHour, endMinute] = endTime.split(":").map(Number);
-    
+
     const now = currentTime;
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
-    
+
     // Only show ongoing classes between 8am and 5pm
     if (currentHour < 8 || currentHour >= 17) {
       return false;
     }
-    
+
     // Convert all times to minutes for easier comparison
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
     const startTimeInMinutes = startHour * 60 + startMinute;
     const endTimeInMinutes = endHour * 60 + endMinute;
-    
+
     return currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes < endTimeInMinutes;
   };
 
@@ -132,43 +135,44 @@ const Dashboard = () => {
   // Fetch attendance data
   const fetchAttendance = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token")
-      const email = localStorage.getItem("userEmail")
-      if (!token) throw new Error("Authentication required. Please login again.")
-      setUserEmail(email || "User")
+      if (!user || !user.token) throw new Error("Authentication required. Please login again.")
+      setUserEmail(user.email || "User")
       console.log("Fetching attendance data...")
       const response = await axios.get(`${API_URL}/api/attendance`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${user.token}` },
       })
       console.log("📌 Attendance API Response:", response.data)
+
       if (response.data.success) {
+        // Process the data
         // Extract records from response
         const records = response.data.attendance.records || [];
-        
+
         // Filter out header rows and empty records
         // Use set to ensure uniqueness based on course title AND category
         const seen = new Set();
         const uniqueRecords = [];
-        
+
         for (const record of records) {
           // Skip invalid records and headers
-          if (!record.course_title || 
-              record.course_title.trim() === "Course Title" || 
+          if (!record.course_title ||
+              record.course_title.trim() === "Course Title" ||
               !record.attendance_percentage ||
               !record.category) {
             continue;
           }
-          
+
           // Create unique key combining course title and category
           const uniqueKey = `${record.course_title}-${record.category}`;
-          
+
           // Only add if this combination hasn't been seen before
           if (!seen.has(uniqueKey)) {
             seen.add(uniqueKey);
             uniqueRecords.push(record);
           }
         }
-        
+
+        console.log("Attendance data processed successfully");
         setAttendanceData(uniqueRecords);
       } else {
         throw new Error(response.data.error || "No attendance records found.")
@@ -182,31 +186,65 @@ const Dashboard = () => {
       } else {
         setError(err.message || "An error occurred while fetching attendance data.")
       }
+      throw err; // Rethrow to allow caller to handle
     }
-  }, [navigate])
+  }, [navigate, user])
+
+  // Debug function to check timetable data structure
+  const debugTimetableData = (timetableData) => {
+    console.log("DEBUG: Timetable Data Structure:", timetableData);
+
+    // Check if timetable data is empty
+    const isEmpty = Object.keys(timetableData).length === 0;
+    console.log("DEBUG: Timetable is empty?", isEmpty);
+
+    // Check if courses arrays are empty
+    let emptyCourseCount = 0;
+    let nonEmptyCourseCount = 0;
+
+    Object.entries(timetableData).forEach(([day, dayData]) => {
+      Object.entries(dayData).forEach(([timeSlot, slotData]) => {
+        if (slotData.courses && slotData.courses.length === 0) {
+          emptyCourseCount++;
+          console.log(`DEBUG: Empty course array at ${day} ${timeSlot}`);
+        } else if (slotData.courses && slotData.courses.length > 0) {
+          nonEmptyCourseCount++;
+          console.log(`DEBUG: Non-empty course at ${day} ${timeSlot}:`, slotData.courses[0].title);
+        }
+      });
+    });
+
+    console.log(`DEBUG: Empty course arrays: ${emptyCourseCount}, Non-empty: ${nonEmptyCourseCount}`);
+    return timetableData;
+  };
 
   // Fetch timetable data
   const fetchTimetable = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token")
+      if (!user || !user.token) throw new Error("Authentication required. Please login again.")
       const password = localStorage.getItem("userPassword") || ""
-      if (!token) throw new Error("Authentication required. Please login again.")
-      
+
       // Load saved edits from localStorage first
       const savedEdits = localStorage.getItem('timetableEdits');
       const localEdits = savedEdits ? JSON.parse(savedEdits) : {};
       setLocalEdits(localEdits);
-      
+
       console.log("Fetching timetable data...")
       const response = await axios.get(`${API_URL}/api/timetable`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${user.token}` },
         data: { password: password }
       })
-      
+
       if (response.data.success) {
+        console.log("Raw timetable data received:", response.data);
+
+        // If we have the data immediately, process it
         // Merge local edits with timetable data
         const mergedTimetable = { ...response.data.timetable };
-        
+
+        // Debug the timetable data structure
+        debugTimetableData(mergedTimetable);
+
         // Apply local edits
         Object.entries(localEdits).forEach(([day, dayData]) => {
           if (!mergedTimetable[day]) {
@@ -216,8 +254,8 @@ const Dashboard = () => {
             mergedTimetable[day][timeSlot] = slotData;
           });
         });
-        
-        console.log("Merged Timetable:", mergedTimetable);
+
+        console.log("Timetable data processed successfully");
         setTimetableData(mergedTimetable)
         setBatch(response.data.batch || "")
         setPersonalDetails(response.data.personal_details || {})
@@ -227,20 +265,23 @@ const Dashboard = () => {
     } catch (err) {
       console.error("Timetable fetch error:", err)
       setError(err.message || "An error occurred while fetching timetable data.")
+      throw err; // Rethrow to allow caller to handle
     }
-  }, [])
+  }, [user])
 
   // Fetch marks data
   const fetchMarks = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token")
-      if (!token) throw new Error("Authentication required. Please login again.")
+      if (!user || !user.token) throw new Error("Authentication required. Please login again.")
       console.log("Fetching marks data...")
       const response = await axios.get(`${API_URL}/api/marks`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${user.token}` },
       })
       console.log("📌 Marks API Response:", response.data)
+
       if (response.data.success) {
+        // Process the data
+        console.log("Marks data processed successfully")
         setMarksData(response.data.marks || {})
       } else {
         throw new Error(response.data.error || "No marks records found.")
@@ -248,58 +289,140 @@ const Dashboard = () => {
     } catch (err) {
       console.error("Marks fetch error:", err)
       setError(err.message || "An error occurred while fetching marks data.")
+      throw err; // Rethrow to allow caller to handle
     }
-  }, [])
+  }, [user])
+
+
+
+  // Function to fetch all data
+  const fetchAllData = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true)
+        setRefreshError(null)
+      } else {
+        setLoading(true)
+        setError("Loading your data. This may take a minute for the first login...")
+      }
+
+      console.log(isRefresh ? "Refreshing all data..." : "Fetching all data...")
+
+      // Fetch timetable data first
+      try {
+        await fetchTimetable()
+        console.log("Timetable data fetched successfully")
+      } catch (e) {
+        console.error("Error fetching timetable:", e)
+      }
+
+      // Short delay before fetching attendance
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Fetch attendance data
+      try {
+        await fetchAttendance()
+        console.log("Attendance data fetched successfully")
+      } catch (e) {
+        console.error("Error fetching attendance:", e)
+      }
+
+      // Short delay before fetching marks
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Fetch marks data
+      try {
+        await fetchMarks()
+        console.log("Marks data fetched successfully")
+      } catch (e) {
+        console.error("Error fetching marks:", e)
+      }
+
+      // Update last updated timestamp
+      setLastUpdated(new Date().toLocaleString())
+
+      // Set loading states to false
+      if (isRefresh) {
+        setRefreshing(false)
+      } else {
+        setLoading(false)
+        setError("") // Clear error message
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error)
+      if (isRefresh) {
+        setRefreshing(false)
+        setRefreshError("Failed to refresh data. Please try again.")
+      } else {
+        setLoading(false)
+        setError("An error occurred while fetching data. Please refresh the page.")
+      }
+    }
+  }, [fetchTimetable, fetchAttendance, fetchMarks])
 
   // Fetch all data on mount
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
+    if (!user || !user.token) {
       navigate("/")
       return
     }
-    
-    // Simple fetch logic without extra flags
-    const fetchDataOnce = async () => {
-      try {
-        await fetchTimetable()
-        await fetchAttendance()
-        await fetchMarks()
-        setLoading(false)
-      } catch (error) {
-        console.error("Error fetching data:", error)
-        setLoading(false)
+
+    // Create a flag to track if component is mounted
+    let isMounted = true
+
+    // Execute the fetch
+    fetchAllData()
+
+    // Listen for refresh_data events from the WebSocket notifications
+    const handleRefreshData = (event) => {
+      console.log("Received refresh_data event, refreshing data...", event.detail)
+      if (isMounted) {
+        // Check if this is an immediate refresh request
+        if (event.detail?.immediate) {
+          console.log("Performing immediate data refresh")
+          fetchAllData(true)
+        }
+        // Check if this is a follow-up refresh request
+        else if (event.detail?.followUp) {
+          console.log("Performing follow-up data refresh")
+          fetchAllData(true)
+        }
+        // Default behavior for backward compatibility
+        else {
+          fetchAllData(true)
+        }
       }
     }
-    
-    fetchDataOnce()
-    
+
+    // Add event listener
+    window.addEventListener('refresh_data', handleRefreshData)
+
     return () => {
-      // Clean-up logic if needed
+      // Clean up on unmount
+      isMounted = false
+      window.removeEventListener('refresh_data', handleRefreshData)
     }
-  }, [fetchAttendance, fetchTimetable, fetchMarks, navigate])
+  }, [navigate, fetchAllData, user])
 
   const handleLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("userEmail")
-    localStorage.removeItem("userId")
+    logout() // Use the logout function from AuthContext
     navigate("/")
   }
 
   const getSlotColor = (slot, timeSlot) => {
     if (!slot || !slot.courses || slot.courses.length === 0) return "bg-[#1E2A1E]"
-    
+
     // Check if this is a manually edited cell
     if (slot.isManualEdit) return "bg-[#1e3a5a]" // Dark blue background for manual edits
-    
+
     // Parse the time to determine if it's before or after 12:30
     const time = timeSlot.split("-")[0].trim()
     const [hours, minutes] = time.split(":").map(Number)
     const isAfternoonSlot = hours >= 12 || (hours === 12 && minutes >= 30)
-    
+
     // Check if it's batch 1 or 2
     const isBatch2 = batch.includes("2")
-    
+
     // Get the slot code from the course info
     let slotCode = "";
     if (slot.original_slot) {
@@ -307,7 +430,7 @@ const Dashboard = () => {
     } else if (slot.courses && slot.courses[0] && slot.courses[0].slot) {
       slotCode = slot.courses[0].slot;
     }
-    
+
     // For Batch 2:
     if (isBatch2) {
       // Check if the slot code starts with 'P' (lab slot)
@@ -316,7 +439,7 @@ const Dashboard = () => {
       } else {
         return "bg-[#FFD700]/20" // Yellow for theory
       }
-    } 
+    }
     // For Batch 1:
     else {
       // Check if the slot code starts with 'P' (lab slot)
@@ -367,68 +490,68 @@ const Dashboard = () => {
         unit: 'mm',
         format: 'a4'
       });
-      
+
       // Format time slots to match backend format (HH:mm)
       const timeSlots = [
         "08:00-08:50", "08:50-09:40", "09:45-10:35", "10:40-11:30",
         "11:35-12:25", "12:30-01:20", "01:25-02:15", "02:20-03:10",
         "03:10-04:00", "04:00-04:50"
       ];
-      
+
       // Define table dimensions
       const margin = 10;
       const cellWidth = (pdf.internal.pageSize.width - margin * 2) / (timeSlots.length + 1);
       const cellHeight = 15;
       const startX = margin;
       const startY = margin;
-      
+
       // Set title
       pdf.setFontSize(18);
       pdf.setTextColor(0, 0, 0);
       pdf.text('Acadia Timetable', pdf.internal.pageSize.width / 2, startY - 5, { align: 'center' });
-      
+
       // Draw header row
       pdf.setFillColor(45, 55, 72);
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(10);
-      
+
       // Time header cell
       pdf.rect(startX, startY, cellWidth, cellHeight, 'F');
       pdf.text('Time', startX + cellWidth / 2, startY + cellHeight / 2, { align: 'center', baseline: 'middle' });
-      
+
       // Time slot header cells
       timeSlots.forEach((slot, index) => {
         const x = startX + cellWidth * (index + 1);
         pdf.rect(x, startY, cellWidth, cellHeight, 'F');
-        
+
         // Convert 24h format to 12h format for display
         const displayTime = slot.split('-').map(time => {
           const [hours, minutes] = time.split(':');
           const h = parseInt(hours);
           return `${h > 12 ? h - 12 : h}:${minutes}${h >= 12 ? 'PM' : 'AM'}`;
         }).join('-');
-        
+
         pdf.text(displayTime, x + cellWidth / 2, startY + cellHeight / 2, { align: 'center', baseline: 'middle' });
       });
-      
+
       // Draw day rows
       for (let day = 1; day <= 5; day++) {
         const rowY = startY + cellHeight * day;
-        
+
         // Day label cell
         pdf.setFillColor(45, 55, 72);
         pdf.setTextColor(255, 255, 255);
         pdf.rect(startX, rowY, cellWidth, cellHeight, 'F');
         pdf.text(`Day ${day}`, startX + cellWidth / 2, rowY + cellHeight / 2, { align: 'center', baseline: 'middle' });
-        
+
         // Subject cells
         timeSlots.forEach((timeSlot, index) => {
           const x = startX + cellWidth * (index + 1);
-          
+
           // Get subject data
           const dayData = timetableData[`Day ${day}`] || {};
           const slotData = dayData[timeSlot];
-          
+
           // Set appropriate fill color based on slot type
           if (slotData?.isManualEdit) {
             pdf.setFillColor(30, 64, 175, 0.3); // Dark blue for manual edits
@@ -439,14 +562,14 @@ const Dashboard = () => {
           } else {
             pdf.setFillColor(30, 42, 30); // Dark green for empty slots
           }
-          
+
           // Draw cell background
           pdf.rect(x, rowY, cellWidth, cellHeight, 'F');
-          
+
           // Draw cell content
           pdf.setTextColor(0, 0, 0);
           pdf.setFontSize(8);
-          
+
           if (slotData?.courses?.length > 0) {
             const course = slotData.courses[0];
             pdf.text(course.title || '', x + cellWidth / 2, rowY + cellHeight / 2 - 3, { align: 'center', baseline: 'middle' });
@@ -455,16 +578,16 @@ const Dashboard = () => {
           } else {
             pdf.text('No class', x + cellWidth / 2, rowY + cellHeight / 2, { align: 'center', baseline: 'middle' });
           }
-          
+
           // Draw cell border
           pdf.setDrawColor(0);
           pdf.rect(x, rowY, cellWidth, cellHeight);
         });
       }
-      
+
       // Save the PDF
       pdf.save('timetable.pdf');
-      
+
     } catch (error) {
       console.error('Error downloading timetable:', error);
       alert('Failed to download timetable. Please try again.');
@@ -479,7 +602,7 @@ const Dashboard = () => {
   const handleSaveEdit = () => {
     try {
       const newEdits = { ...localEdits };
-      
+
       if (editValue.trim() === "") {
         // Remove edit if empty
         if (newEdits[`Day ${editingCell.day}`]?.[editingCell.timeSlot]) {
@@ -507,7 +630,7 @@ const Dashboard = () => {
       // Update state and storage
       localStorage.setItem('timetableEdits', JSON.stringify(newEdits));
       setLocalEdits(newEdits);
-      
+
       // Force update timetable data
       const updatedTimetable = { ...timetableData };
       if (editValue.trim() === "") {
@@ -527,7 +650,7 @@ const Dashboard = () => {
         };
       }
       setTimetableData(updatedTimetable);
-      
+
       alert("Timetable updated successfully!");
     } catch (error) {
       console.error("Failed to save edit:", error);
@@ -541,16 +664,87 @@ const Dashboard = () => {
   const handleDeadlineAdd = (date, text) => {
     const newDeadlines = { ...deadlines };
     const dateStr = date.toISOString().split('T')[0];
-    
+
     if (!text.trim()) {
       delete newDeadlines[dateStr];
     } else {
       newDeadlines[dateStr] = text;
     }
-    
+
     setDeadlines(newDeadlines);
     localStorage.setItem('deadlines', JSON.stringify(newDeadlines));
   };
+
+  // Check for upcoming deadlines
+  const checkUpcomingDeadlines = useCallback(() => {
+    const now = new Date();
+
+    // Calculate the date 30 hours from now
+    const thirtyHoursLater = new Date(now);
+    thirtyHoursLater.setHours(thirtyHoursLater.getHours() + 30);
+
+    // Create a new array for notifications
+    const newNotifications = [];
+
+    // Check deadlines - only show notifications for deadlines that are within 30 hours
+    Object.entries(deadlines).forEach(([dateStr, text]) => {
+      const deadlineDate = new Date(dateStr);
+
+      // Set the deadline time to end of day (23:59:59)
+      deadlineDate.setHours(23, 59, 59, 999);
+
+      // Check if the deadline is within the next 30 hours
+      if (deadlineDate > now && deadlineDate <= thirtyHoursLater) {
+        console.log(`Deadline within 30 hours: ${text}`);
+
+        // Calculate how many hours until the deadline
+        const hoursUntil = Math.round((deadlineDate - now) / (1000 * 60 * 60));
+        const dueText = hoursUntil <= 24 ?
+          `due in ${hoursUntil} hour${hoursUntil === 1 ? '' : 's'}` :
+          `due tomorrow`;
+
+        // Add to our notifications array
+        newNotifications.push({
+          id: Date.now() + Math.random(),
+          text: text,
+          date: dateStr,
+          hoursUntil: hoursUntil
+        });
+
+        // Show browser notification for upcoming deadlines
+        if (window.Notification && Notification.permission === "granted") {
+          new Notification("Deadline Reminder", {
+            body: `Reminder: "${text}" is ${dueText}`,
+            icon: "/favicon.ico"
+          });
+        } else if (window.Notification && Notification.permission !== "denied") {
+          Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+              new Notification("Deadline Reminder", {
+                body: `Reminder: "${text}" is ${dueText}`,
+                icon: "/favicon.ico"
+              });
+            }
+          });
+        }
+      }
+    });
+
+    // Only update state if we have notifications
+    if (newNotifications.length > 0) {
+      setNotifications(newNotifications);
+    }
+
+    // Log that we checked for deadlines
+    console.log(`Checked for deadlines within 30 hours at ${now.toLocaleTimeString()}`);
+  }, [deadlines]);
+
+  // Request notification permissions
+  useEffect(() => {
+    if (window.Notification && Notification.permission !== "granted" && Notification.permission !== "denied") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Load deadlines from localStorage on component mount
   useEffect(() => {
@@ -560,11 +754,24 @@ const Dashboard = () => {
     }
   }, []);
 
+  // Check for upcoming deadlines after deadlines are loaded
+  useEffect(() => {
+    // Only run if we have deadlines
+    if (Object.keys(deadlines).length > 0) {
+      // Check for upcoming deadlines after a short delay to ensure UI is loaded
+      const timer = setTimeout(() => {
+        checkUpcomingDeadlines();
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [deadlines, checkUpcomingDeadlines]);
+
   const renderCalendar = () => {
     const currentDate = new Date();
     const currentMonth = currentDate.toLocaleString('default', { month: 'long' }).toUpperCase();
     const currentYear = currentDate.getFullYear().toString();
-    
+
     const monthData = CALENDAR_DATA.find(
       m => m.month === currentMonth && m.year === currentYear
     );
@@ -574,13 +781,17 @@ const Dashboard = () => {
     // Get month index (0-11) from month name
     const monthIndex = new Date(`${monthData.month} 1, ${currentYear}`).getMonth();
 
+    // Calculate empty cells at the beginning of the month
+    const firstDay = new Date(currentYear, monthIndex, 1);
+    const emptyCells = firstDay.getDay(); // 0 for Sunday, 1 for Monday, etc.
+
     return (
       <div className="mb-8 bg-gray-800/50 rounded-lg p-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-medium">Academic Calendar</h2>
           <div className="flex items-center gap-4">
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
               onChange={(e) => setSelectedDate(new Date(e.target.value))}
               className="bg-gray-700 text-white px-3 py-2 rounded-lg"
@@ -613,14 +824,21 @@ const Dashboard = () => {
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <div key={day} className="text-gray-400 text-sm py-2">{day}</div>
           ))}
-          
+
+          {/* Empty cells for days before the 1st of the month */}
+          {Array(emptyCells).fill(null).map((_, index) => (
+            <div key={`empty-${index}`} className="p-2 invisible">
+              <div className="text-base font-medium">&nbsp;</div>
+            </div>
+          ))}
+
           {monthData.days.map((day, index) => {
             // Create date object with the correct month index
             const date = new Date(currentYear, monthIndex, day.date);
             const dateStr = date.toISOString().split('T')[0];
             const hasDeadline = deadlines[dateStr];
             const isToday = date.toDateString() === new Date().toDateString();
-            
+
             return (
               <div
                 key={index}
@@ -689,7 +907,7 @@ const Dashboard = () => {
           Authorization: `Bearer ${token}`
         }
       })
-      
+
       if (response.data.success && response.data.status === "completed") {
         setRefreshing(false)
         // Update last updated timestamp
@@ -698,12 +916,12 @@ const Dashboard = () => {
           // Store the timestamp in localStorage
           localStorage.setItem("lastUpdated", response.data.updated_at)
         }
-        
+
         // Refresh the data
         fetchTimetable()
         fetchAttendance()
         fetchMarks()
-        
+
         return true
       }
       return false
@@ -728,7 +946,7 @@ const Dashboard = () => {
       hour12: true
     })
   }
-  
+
   // Load last updated timestamp on component mount
   useEffect(() => {
     const storedTimestamp = localStorage.getItem("lastUpdated")
@@ -736,7 +954,7 @@ const Dashboard = () => {
       setLastUpdated(storedTimestamp)
     }
   }, [])
-  
+
   // Cooldown timer effect
   useEffect(() => {
     let interval
@@ -751,21 +969,21 @@ const Dashboard = () => {
         })
       }, 1000)
     }
-    
+
     return () => clearInterval(interval)
   }, [refreshCooldown, cooldownTimer])
-  
+
   // Handle refresh button click
   const handleRefresh = async () => {
     // Don't proceed if already refreshing or in cooldown
     if (refreshing || refreshCooldown) return
-    
+
     setRefreshing(true)
     setRefreshError(null)
-    
+
     try {
       const token = localStorage.getItem("token")
-      
+
       // Start the refresh process
       await axios.post(`${API_URL}/api/refresh-data`, {}, {
         headers: {
@@ -773,34 +991,34 @@ const Dashboard = () => {
           'Content-Type': 'application/json'
         }
       })
-      
+
       // Poll for status every 5 seconds
       let completed = false
       let attempts = 0
       const maxAttempts = 30 // 2.5 minutes timeout (30 * 5 seconds)
-      
+
       const statusInterval = setInterval(async () => {
         completed = await checkRefreshStatus()
         attempts++
-        
+
         if (completed || attempts >= maxAttempts) {
           clearInterval(statusInterval)
           if (!completed && attempts >= maxAttempts) {
             setRefreshError("Refresh timed out. Please try again later.")
             setRefreshing(false)
           }
-          
+
           // Set cooldown after refresh is completed
           setRefreshCooldown(true)
           setCooldownTimer(60) // 60 seconds cooldown
         }
       }, 5000)
-      
+
     } catch (error) {
       console.error("Error refreshing data:", error)
       setRefreshing(false)
       setRefreshError(error.response?.data?.error || "Failed to refresh data")
-      
+
       // Set cooldown even if refresh failed
       setRefreshCooldown(true)
       setCooldownTimer(60) // 60 seconds cooldown
@@ -821,8 +1039,42 @@ const Dashboard = () => {
       </div>
     )
 
+  // Render notifications
+  const renderNotifications = () => {
+    if (notifications.length === 0) return null;
+
+    return (
+      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        {notifications.map(notification => (
+          <div
+            key={notification.id}
+            className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 px-4 py-3 rounded-lg shadow-lg"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <strong>Deadline Reminder:</strong>
+                <p>"{notification.text}" is {notification.hoursUntil <= 24 ?
+                  `due in ${notification.hoursUntil} hour${notification.hoursUntil === 1 ? '' : 's'}` :
+                  `due tomorrow`}</p>
+                <p className="text-xs mt-1">{new Date(notification.date).toLocaleDateString()}</p>
+              </div>
+              <button
+                onClick={() => setNotifications(prev => prev.filter(n => n.id !== notification.id))}
+                className="text-yellow-400 hover:text-yellow-300 ml-2"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#0D1117] text-gray-100">
+      {/* Render notifications */}
+      {renderNotifications()}
       {/* Header */}
       <div className="border-b border-gray-800 bg-[#0D1117] py-4 px-6">
         <div className="flex justify-between items-center">
@@ -832,8 +1084,8 @@ const Dashboard = () => {
           </div>
           <div className="flex gap-2">
             <div className="flex flex-col items-end">
-              <button 
-                onClick={handleRefresh} 
+              <button
+                onClick={handleRefresh}
                 disabled={refreshing || refreshCooldown}
                 className={`px-3 py-1 text-sm border border-gray-700 rounded flex items-center gap-2 ${
                   refreshing || refreshCooldown ? "bg-gray-700 cursor-not-allowed" : "hover:bg-gray-800"
@@ -883,7 +1135,7 @@ const Dashboard = () => {
       <div className="p-6 max-w-7xl mx-auto">
         {/* Calendar Toggle Button */}
         <div className="mb-4 flex justify-end">
-          <button 
+          <button
             onClick={() => setShowCalendar(!showCalendar)}
             className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
           >
@@ -899,14 +1151,14 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-medium">Timetable</h2>
             <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setShowDetails(!showDetails)} 
+              <button
+                onClick={() => setShowDetails(!showDetails)}
                 className="text-gray-400 hover:text-white"
               >
                 {showDetails ? 'Hide Details' : 'Show Details'}
               </button>
-              <button 
-                onClick={downloadTimetable} 
+              <button
+                onClick={downloadTimetable}
                 className="text-gray-400 hover:text-white"
               >
                 Download
@@ -923,7 +1175,7 @@ const Dashboard = () => {
                   if (hours < 8) totalMinutes += 12 * 60;
                   return totalMinutes;
                 };
-                
+
                 const timeA = parseTime(a.split("-")[0].trim());
                 const timeB = parseTime(b.split("-")[0].trim());
                 return timeA - timeB;
@@ -1013,22 +1265,22 @@ const Dashboard = () => {
               })}
           </div>
           <div className="flex justify-between items-center mt-4">
-            <button 
+            <button
               onClick={() => handleDayChange(currentDay - 1)}
               className="text-gray-400 hover:text-white"
             >
               ← Day {currentDay === 1 ? 5 : currentDay - 1}
             </button>
-            <button 
+            <button
               onClick={() => {
                 const todayDayOrder = getTodayDayOrder();
                 if (todayDayOrder) {
                   setCurrentDay(todayDayOrder);
                 }
-              }} 
+              }}
               className={`px-4 py-2 rounded-lg text-sm ${
-                getTodayDayOrder() === null 
-                  ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed' 
+                getTodayDayOrder() === null
+                  ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-800 text-white hover:bg-gray-700'
               }`}
               disabled={getTodayDayOrder() === null}
@@ -1036,7 +1288,7 @@ const Dashboard = () => {
             >
               Today {getTodayDayOrder() ? `(Day ${getTodayDayOrder()})` : ''}
             </button>
-            <button 
+            <button
               onClick={() => handleDayChange(currentDay + 1)}
               className="text-gray-400 hover:text-white"
             >
@@ -1050,8 +1302,8 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-medium">Attendance</h2>
             <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsPredictionModalOpen(true)} 
+              <button
+                onClick={() => setIsPredictionModalOpen(true)}
                 className="text-gray-400 hover:text-white"
               >
                 Predict
@@ -1072,8 +1324,8 @@ const Dashboard = () => {
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-medium text-gray-100">{record.course_title}</h3>
                       <span className={`px-2 py-0.5 text-xs rounded-full ${
-                        record.category === 'Theory' 
-                          ? 'bg-amber-500/20 text-amber-300' 
+                        record.category === 'Theory'
+                          ? 'bg-amber-500/20 text-amber-300'
                           : 'bg-emerald-500/20 text-emerald-300'
                       }`}>
                         {record.category}
@@ -1120,11 +1372,11 @@ const Dashboard = () => {
             {marksData.records?.filter(record => {
               // Filter out header rows and duplicates
               const name = record.course_name?.trim().toLowerCase();
-              return name && 
-                     name !== 'semester:' && 
+              return name &&
+                     name !== 'semester:' &&
                      name !== 'course title' &&
-                     record.tests?.some(test => 
-                       test.obtained_marks !== undefined || 
+                     record.tests?.some(test =>
+                       test.obtained_marks !== undefined ||
                        test.max_marks !== undefined ||
                        test.test_code
                      );
@@ -1146,15 +1398,15 @@ const Dashboard = () => {
                   <span className="text-yellow-400">✦</span>
                   <h3 className="font-medium">{record.course_name}</h3>
                 </div>
-                {record.tests?.some(test => 
-                  test.obtained_marks !== undefined || 
+                {record.tests?.some(test =>
+                  test.obtained_marks !== undefined ||
                   test.max_marks !== undefined ||
                   test.test_code
                 ) ? (
                   <div className="space-y-4">
                     {record.tests
-                      .filter(test => 
-                        test.obtained_marks !== undefined || 
+                      .filter(test =>
+                        test.obtained_marks !== undefined ||
                         test.max_marks !== undefined ||
                         test.test_code
                       )
@@ -1166,7 +1418,7 @@ const Dashboard = () => {
                           {test.obtained_marks !== undefined && test.max_marks !== undefined ? (
                             <div className="text-sm font-medium">
                               <span className={`
-                                ${test.obtained_marks === test.max_marks 
+                                ${test.obtained_marks === test.max_marks
                                   ? "text-green-400"  // Full marks - bright green
                                   : test.obtained_marks >= (test.max_marks * 0.4)
                                     ? "text-green-500/80"  // Passing marks - slightly dimmer green

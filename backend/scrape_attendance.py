@@ -1,4 +1,4 @@
-''' import time          
+import time          
 import json
 import os
 import traceback
@@ -694,4 +694,4 @@ if __name__ == "__main__":
     email_input = input("Enter your email: ")
     pwd_input = input("Enter your password: ")
     outcome = run_scraper(email_input, pwd_input)
-    print(f"Scraper outcome: {outcome}")'''
+    print(f"Scraper outcome: {outcome}")

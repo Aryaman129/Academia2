@@ -135,18 +135,18 @@ class SRMScraper:
         self.is_logged_in = False
         self.email = email
         self.password = password
-        
+
     def setup_driver(self):
         """Initialize Chrome driver with appropriate options for Render deployment"""
         logger.info("Setting up Chrome driver...")
-        
+
         chrome_options = Options()
         # Essential flags for Render's free tier
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
-        
+
         # Memory optimization flags (critical for Render free tier)
         chrome_options.add_argument('--disable-renderer-backgrounding')
         chrome_options.add_argument('--disable-background-timer-throttling')
@@ -155,7 +155,7 @@ class SRMScraper:
         chrome_options.add_argument('--memory-pressure-off')
         chrome_options.add_argument('--single-process')  # Important for limiting memory usage
         chrome_options.add_argument('--remote-debugging-port=9222')  # Enable debugging
-        
+
         # Basic optimization flags
         chrome_options.add_argument('--window-size=1920,1080')
         chrome_options.add_argument('--disable-extensions')
@@ -166,7 +166,7 @@ class SRMScraper:
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        
+
         try:
             # Try direct approach first
             logger.info("Attempting to initialize Chrome driver directly...")
@@ -176,13 +176,13 @@ class SRMScraper:
         except Exception as e1:
             logger.warning(f"⚠️ Direct initialization failed: {e1}")
             time.sleep(2)  # Small delay between attempts
-            
+
             try:
                 # Try with webdriver-manager
                 logger.info("Attempting to initialize Chrome driver with webdriver-manager...")
                 from selenium.webdriver.chrome.service import Service
                 from webdriver_manager.chrome import ChromeDriverManager
-                
+
                 try:
                     # Try getting the path or directly installing
                     chrome_driver_path = ChromeDriverManager().install()
@@ -201,19 +201,19 @@ class SRMScraper:
                         return self.driver
                     else:
                         raise Exception("ChromeDriver not found at expected path")
-                
+
             except Exception as e2:
                 logger.warning(f"⚠️ Webdriver-manager initialization failed: {e2}")
                 time.sleep(1)  # Small delay between attempts
-                
+
                 try:
                     # Final attempt with undetected_chromedriver
                     logger.info("Attempting to initialize with undetected_chromedriver...")
                     import undetected_chromedriver as uc
-                    
+
                     # Set environment variables to debug undetected_chromedriver
                     os.environ['UC_LOG_LEVEL'] = 'DEBUG'
-                    
+
                     # Make more resilient
                     for attempt in range(3):
                         try:
@@ -223,10 +223,10 @@ class SRMScraper:
                         except Exception as retry_error:
                             logger.warning(f"⚠️ undetected_chromedriver attempt {attempt+1} failed: {retry_error}")
                             time.sleep(2)  # Wait a bit before retrying
-                        
+
                     # If we're here, all retry attempts failed
                     raise Exception("All undetected_chromedriver attempts failed")
-                    
+
                 except Exception as e3:
                     logger.error(f"❌ All initialization methods failed: {e3}")
                     logger.error("Please make sure Chrome is installed on this system.")
@@ -237,14 +237,14 @@ class SRMScraper:
         # If already logged in, return True
         if self.is_logged_in:
             return True
-            
+
         # Initialize driver if needed
         if not self.driver:
             self.setup_driver()
-            
+
         # Perform login
         return self.login()
-    
+
     def create_jwt_token(self, email):
         """Create a JWT token with 30-day expiration"""
         try:
@@ -268,7 +268,7 @@ class SRMScraper:
         try:
             self.driver.get(LOGIN_URL)
             wait = WebDriverWait(self.driver, 30)
-            
+
             # Switch to iframe with retry
             for attempt in range(3):
                 try:
@@ -280,7 +280,7 @@ class SRMScraper:
                     if attempt == 2:  # Last attempt failed
                         raise
                     time.sleep(2)
-                
+
             # Enter email with retry
             for attempt in range(3):
                 try:
@@ -312,7 +312,7 @@ class SRMScraper:
             # ===== Critical Fix: Wait longer and switch iframe context if needed =====
             # Wait longer for the page transition to complete
             time.sleep(2)  # Increase from 2s to 5s
-            
+
             # Check if we need to switch to iframe again
             try:
                 # First check if we're already in the correct context
@@ -322,7 +322,7 @@ class SRMScraper:
                 logger.info("Switching iframe context for password field")
                 self.driver.switch_to.default_content()
                 wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "signinFrame")))
-            
+
             # Enter password with retry - now with better iframe handling
             for attempt in range(3):
                 try:
@@ -343,7 +343,7 @@ class SRMScraper:
                         try:
                             logger.info("Trying JavaScript approach to enter password")
                             self.driver.execute_script(
-                                'document.getElementById("password").value = arguments[0]', 
+                                'document.getElementById("password").value = arguments[0]',
                                 self.password
                             )
                             logger.info("Entered password via JavaScript")
@@ -366,10 +366,10 @@ class SRMScraper:
                     time.sleep(2)
 
             time.sleep(3)
-            
+
             # Switch back to default content
             self.driver.switch_to.default_content()
-            
+
             # Verify login success
             if BASE_URL in self.driver.current_url:
                 try:
@@ -377,18 +377,18 @@ class SRMScraper:
                         EC.presence_of_element_located((By.XPATH, "//a[contains(@href, 'My_Attendance')]"))
                     )
                     logger.info("✅ Login verified with dashboard elements")
-                    
+
                     # Extract cookies after successful login
                     try:
                         cookies = self.driver.get_cookies()
                         cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
                         logger.info(f"✅ Extracted {len(cookie_dict)} cookies: {list(cookie_dict.keys())}")
-                        
+
                         # Generate JWT token
                         token = self.create_jwt_token(self.email)
                         if not token:
                             raise Exception("Failed to generate JWT token")
-                        
+
                         # Save cookies and token to file for debugging
                         debug_data = {
                             'cookies': cookie_dict,
@@ -397,7 +397,7 @@ class SRMScraper:
                         with open('debug_cookies.json', 'w') as f:
                             json.dump(debug_data, f)
                         logger.info("✅ Saved cookies and token to debug file")
-                        
+
                         # Store cookies and token in Supabase
                         try:
                             cookie_data = {
@@ -406,32 +406,32 @@ class SRMScraper:
                                 'token': token,
                                 'updated_at': datetime.now().isoformat()
                             }
-                            
+
                             # Delete old record first
                             supabase.table('user_cookies').delete().eq('email', self.email).execute()
                             logger.info("✅ Deleted old cookie record")
-                            
+
                             # Insert new record
                             result = supabase.table('user_cookies').insert(cookie_data).execute()
                             logger.info("✅ Stored new cookie record with token")
-                            
+
                         except Exception as e:
                             logger.error(f"❌ Failed to store cookies and token in Supabase: {e}")
-                        
+
                     except Exception as e:
                         logger.error(f"❌ Failed to extract/store cookies and token: {e}")
-                    
+
                     self.is_logged_in = True
                     return True
                 except:
                     logger.warning("⚠️ Login appears successful but dashboard elements not found")
-                
+
                 self.is_logged_in = True
                 return True
             else:
                 logger.error("Login failed, check credentials or CAPTCHA")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error during login: {e}")
             return False
@@ -440,18 +440,21 @@ class SRMScraper:
         """Navigate to attendance page and get HTML"""
         if not self.ensure_login():
             return None
-            
+
         logger.info("Navigating to attendance page")
         self.driver.get(ATTENDANCE_PAGE_URL)
-        
+
         try:
-            time.sleep(25)
+            # Use a fixed sleep time of 10 seconds (reduced from 13)
+            logger.info("Using fixed sleep time of 10 seconds to ensure page loads")
+            time.sleep(10)
             logger.info("Attendance page loaded successfully")
         except Exception as e:
             logger.warning(f"Timed out waiting for attendance page: {e}")
             # Fallback to a longer sleep if the element isn't found
-            logger.info("Using fixed sleep time of 55 seconds")
-        
+            logger.info("Using fallback sleep time of 12 additional seconds")
+            time.sleep(12)
+
         html_source = self.driver.page_source
         return html_source
 
@@ -594,7 +597,7 @@ class SRMScraper:
                     logger.error("❌ Failed to insert attendance JSON.")
 
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ Error saving attendance data: {e}")
             return False
@@ -608,7 +611,7 @@ class SRMScraper:
         if not attendance_records:
             logger.warning("No attendance records found, using fallback course code.")
             return course_code
-        
+
         for record in attendance_records:
             stored_code = record.get("course_code", "").strip()
             # Check for an exact match (ignoring case)
@@ -617,7 +620,7 @@ class SRMScraper:
             # Check match when "Regular" is removed
             if stored_code.replace("Regular", "").strip().lower() == course_code.replace("Regular", "").strip().lower():
                 return record.get("course_title", course_code)
-        
+
         logger.warning(f"No match found for {course_code}, using fallback course code.")
         return course_code
 
@@ -627,14 +630,14 @@ class SRMScraper:
         This function handles any number of courses dynamically and includes multiple defense mechanisms.
         """
         soup = BeautifulSoup(html, "html.parser")
-        
+
         # Extract registration number
         registration_number = self.extract_registration_number(soup)
         if not registration_number:
             logger.error("Could not find Registration Number for marks!")
             return False
         logger.info(f"Extracted Registration Number (marks): {registration_number}")
-        
+
         # Get or create the user in Supabase
         user_id = self.get_user_id(registration_number)
         if not user_id:
@@ -652,7 +655,7 @@ class SRMScraper:
             attendance_data = attendance_resp.data[0].get("attendance_data", {})
             attendance_records = attendance_data.get("records", [])
         logger.info(f"Loaded {len(attendance_records)} attendance records for user {user_id}")
-        
+
         # Locate the marks table by searching for "Test Performance"
         marks_table = None
         for table in soup.find_all("table"):
@@ -713,7 +716,7 @@ class SRMScraper:
                                 "max_marks": max_marks,
                                 "obtained_marks": obtained_marks
                             })
-                    
+
                     marks_records.append({
                         "course_name": course_title,
                         "tests": tests
@@ -785,11 +788,11 @@ class SRMScraper:
         """Navigate to timetable page and get HTML"""
         if not self.ensure_login():
             return None
-        
+
         logger.info(f"Navigating to timetable page: {TIMETABLE_URL}")
         self.driver.get(TIMETABLE_URL)
-        time.sleep(22)  # Wait for the page to load
-        
+        time.sleep(18)  # Wait for the page to load (reduced from 22)
+
         html_source = self.driver.page_source
         return html_source
 
@@ -817,7 +820,7 @@ class SRMScraper:
             # We'll try to parse from the current page source anyway
 
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
-        
+
         # Method 1: Look for a table cell with "Batch:" label
         batch_label = soup.find("td", string=lambda text: text and "Batch:" in text)
         if batch_label:
@@ -826,7 +829,7 @@ class SRMScraper:
                 batch_text = next_cell.get_text(strip=True)
                 if batch_text and batch_text.isdigit():
                     return batch_text
-        
+
         # Method 2: Look for a table row with batch information
         batch_td = soup.find("td", string=lambda text: text and "Batch" in text and ":" not in text)
         if batch_td:
@@ -836,7 +839,7 @@ class SRMScraper:
                 batch_text = next_td.get_text(strip=True)
                 if batch_text and batch_text.isdigit():
                     return batch_text
-        
+
         # Method 3: Look for a specific pattern in the HTML
         batch_rows = soup.find_all("tr")
         for row in batch_rows:
@@ -846,18 +849,18 @@ class SRMScraper:
                     batch_text = cells[i+1].get_text(strip=True)
                     if batch_text and batch_text.isdigit():
                         return batch_text
-        
+
         # Method 4: Use regex to find batch number pattern in the HTML
         batch_pattern = re.compile(r'Batch:?\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>', re.IGNORECASE)
         match = batch_pattern.search(str(soup))
         if match:
             return match.group(1)
-        
+
         # Method 5: Look for strong tag with batch number
         batch_strong = soup.find("strong", string=lambda text: text and text.isdigit() and len(text.strip()) == 1)
         if batch_strong:
             return batch_strong.get_text(strip=True)
-        
+
         return None
 
     def scrape_timetable(self):
@@ -867,14 +870,14 @@ class SRMScraper:
         html_source = self.get_timetable_page()
         if not html_source:
             return []
-            
+
         max_retries = 3
         extracted_rows = []
-        
+
         for attempt in range(max_retries):
             logger.info(f"Attempt {attempt+1}: Extracting timetable table...")
             soup = BeautifulSoup(self.driver.page_source, "html.parser")
-            
+
             # Attempt to find the timetable
             table = soup.find("table", class_="course_tbl")
             if not table:
@@ -1122,22 +1125,22 @@ class SRMScraper:
         """Store timetable data in Supabase with proper error handling and delays"""
         try:
             logger.info("Storing timetable data in Supabase...")
-            
+
             # Add delay before database operation
             time.sleep(1)
-            
+
             # Get user_id from email
             user_query = supabase.table("users").select("id").eq("email", self.email).execute()
             if not user_query.data:
                 raise Exception("User not found in database")
             user_id = user_query.data[0]["id"]
-            
+
             # Add delay between operations
             time.sleep(1)
-            
+
             # Check if timetable exists
             existing = supabase.table("timetable").select("*").eq("user_id", user_id).execute()
-            
+
             # Prepare timetable data
             timetable_data = {
                 "user_id": user_id,
@@ -1145,10 +1148,10 @@ class SRMScraper:
                 "batch": merged_result["batch"],
                 "personal_details": merged_result.get("personal_details", {})
             }
-            
+
             # Add delay before final operation
             time.sleep(1)
-            
+
             if existing.data and len(existing.data) > 0:
                 # Update existing record
                 update_resp = supabase.table("timetable").update(timetable_data).eq("user_id", user_id).execute()
@@ -1159,10 +1162,10 @@ class SRMScraper:
                 insert_resp = supabase.table("timetable").insert(timetable_data).execute()
                 if not insert_resp.data:
                     raise Exception("Failed to insert timetable data")
-                    
+
             logger.info("✅ Timetable data stored successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ Error storing timetable data: {e}")
             return False
@@ -1176,35 +1179,35 @@ class SRMScraper:
             if not success:
                 logger.error("Failed to log in to Academia. Aborting timetable scraping.")
                 return {"status": "error", "message": "Login failed"}
-            
+
             # Step 1: Scrape timetable data
             course_data = self.scrape_timetable()
             if not course_data:
                 logger.error("Failed to scrape timetable data")
                 return {"status": "error", "message": "Failed to scrape timetable data"}
-            
+
             # Step 2: Auto-detect the batch from the page
             auto_batch = self.parse_batch_number_from_page()
             logger.info(f"Scraped {len(course_data)} courses from timetable page; detected batch={auto_batch}")
-            
+
             # Step 3: Merge timetable with course data
             merged_result = self.merge_timetable_with_courses(course_data, auto_batch)
             if merged_result["status"] != "success":
                 self.driver.quit()
                 return merged_result
-            
+
             # Step 4: Store timetable data in Supabase
             store_success = self.store_timetable_in_supabase(merged_result)
             if not store_success:
                 logger.error("Failed to store timetable in Supabase.")
             else:
                 logger.info("Timetable stored in Supabase successfully.")
-            
+
             self.driver.quit()
             logger.info("Timetable scraper finished successfully")
-            
+
             return merged_result
-        
+
         except Exception as e:
             logger.error(f"Error in timetable scraper: {str(e)}")
             if self.driver:
@@ -1219,42 +1222,42 @@ class SRMScraper:
             if self.driver is None:
                 logger.error("Failed to initialize Chrome driver")
                 return {"status": "error", "message": "Failed to initialize Chrome driver"}
-            
+
             self.apply_timeouts()
-            
+
             success = self.ensure_login()
             if not success:
                 logger.error("Failed to log in to Academia. Aborting attendance scraping.")
                 return {"status": "error", "message": "Login failed"}
-                
+
             html_source = self.get_attendance_page()
             if not html_source:
                 logger.error("Failed to load attendance page")
                 return {"status": "error", "message": "Failed to load attendance page"}
-                
+
             registration_number = self.extract_registration_number(BeautifulSoup(html_source, "html.parser"))
             if not registration_number:
                 logger.error("Failed to extract registration number")
                 return {"status": "error", "message": "Failed to extract registration number"}
-                
+
             user_id = self.get_user_id(registration_number)
             if not user_id:
                 logger.error("Failed to get or create user in database")
                 return {"status": "error", "message": "Failed to get or create user in database"}
-                
+
             result = self.parse_and_save_attendance(html_source, self.driver)
             marks_result = self.parse_and_save_marks(html_source, self.driver)
-            
+
             self.driver.quit()
             logger.info("Attendance scraper finished successfully")
-            
+
             combined_result = {
                 "status": "success",
                 "attendance": result,
                 "marks": marks_result
             }
             return combined_result
-            
+
         except Exception as e:
             logger.error(f"Error in attendance scraper: {str(e)}")
             if self.driver:
@@ -1293,7 +1296,7 @@ class SRMScraper:
             # Check browser cookies
             browser_cookies = self.driver.get_cookies()
             browser_cookie_dict = {cookie['name']: cookie['value'] for cookie in browser_cookies}
-            
+
             # Check file data
             file_data = {}
             try:
@@ -1301,7 +1304,7 @@ class SRMScraper:
                     file_data = json.load(f)
             except:
                 pass
-            
+
             # Check database data
             db_data = {}
             try:
@@ -1310,14 +1313,14 @@ class SRMScraper:
                     db_data = result.data[0]
             except Exception as e:
                 logger.error(f"Failed to fetch database data: {e}")
-            
+
             logger.info(f"""
             Storage Status:
             - Browser: {len(browser_cookie_dict)} cookies
             - File: {len(file_data.get('cookies', {}))} cookies, Token: {'Present' if 'token' in file_data else 'Missing'}
             - Database: {len(db_data.get('cookies', {}))} cookies, Token: {'Present' if 'token' in db_data else 'Missing'}
             """)
-            
+
             return {
                 'browser': browser_cookie_dict,
                 'file': file_data,
@@ -1330,7 +1333,7 @@ class SRMScraper:
     def run_unified_scraper(self):
         """Run both scrapers in a single session"""
         logger.info("Starting unified scraper")
-        
+
         result = {
             "status": "error",
             "attendance_success": False,
@@ -1339,7 +1342,7 @@ class SRMScraper:
             "message": "Not started",
             "cookies": None
         }
-        
+
         try:
             # Setup driver
             self.driver = self.setup_driver()
@@ -1347,19 +1350,19 @@ class SRMScraper:
                 logger.error("Failed to initialize Chrome driver")
                 result["message"] = "Failed to initialize Chrome driver"
                 return result
-            
+
             # Login and extract cookies
             if not self.ensure_login():
                 logger.error("Failed to log in to Academia. Aborting all scraping.")
                 result["message"] = "Login failed"
                 return result
-            
+
             # Verify cookies after login
             cookie_status = self.verify_cookies()
             result["cookies"] = cookie_status
-            
+
             # Continue with existing scraping logic...
-            
+
             return result
         except Exception as e:
             logger.error(f"Error in unified scraper: {str(e)}")
@@ -1395,10 +1398,10 @@ class SRMScraper:
                     'status': 'error',
                     'message': 'No token found in database'
                 }
-            
+
             db_token = result.data[0].get('token')
             updated_at = result.data[0].get('updated_at')
-            
+
             # Verify the token
             email = self.verify_token(db_token)
             if not email:
@@ -1406,14 +1409,14 @@ class SRMScraper:
                     'status': 'error',
                     'message': 'Token is invalid or expired'
                 }
-            
+
             return {
                 'status': 'success',
                 'email': email,
                 'updated_at': updated_at,
                 'days_remaining': self.get_token_days_remaining(db_token)
             }
-        
+
         except Exception as e:
             logger.error(f"Error checking token status: {e}")
             return {
@@ -1441,14 +1444,14 @@ class SRMScraper:
 def run_scraper(email, password, scraper_type="attendance"):
     """
     Run the specified scraper with the provided credentials
-    
+
     scraper_type can be:
     - "attendance": Just run attendance scraper
     - "timetable": Just run timetable scraper
     - "unified": Run both scrapers in a single browser session (recommended for Render)
     """
     scraper = SRMScraper(email, password)
-    
+
     if scraper_type.lower() == "attendance":
         return scraper.run_attendance_scraper()
     elif scraper_type.lower() == "timetable":
@@ -1460,17 +1463,17 @@ def run_scraper(email, password, scraper_type="attendance"):
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="SRM Academia Scraper")
     parser.add_argument("--email", required=True, help="SRM Academia email")
     parser.add_argument("--password", required=True, help="SRM Academia password")
     parser.add_argument("--type", choices=["attendance", "timetable", "unified"], default="attendance",
                       help="Type of scraper to run (attendance, timetable, or unified)")
-    
+
     args = parser.parse_args()
-    
+
     result = run_scraper(args.email, args.password, args.type)
-    
+
     if result["status"] == "success":
         print(f"{args.type.capitalize()} data scraped successfully!")
     else:

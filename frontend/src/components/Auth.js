@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import LoadingIndicator from "./LoadingIndicator"
-import "./Auth.css" // We'll create this file next
+import { useAuth } from "../contexts/AuthContext"
+import "./Auth.css"
 
 // Create axios instance with proper config
 console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -11,27 +12,64 @@ console.log('LOCAL_API_URL:', process.env.REACT_APP_LOCAL_API_URL);
 console.log('API_URL:', process.env.REACT_APP_API_URL);
 
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'development' 
-    ? process.env.REACT_APP_LOCAL_API_URL 
+  baseURL: process.env.NODE_ENV === 'development'
+    ? process.env.REACT_APP_LOCAL_API_URL
     : process.env.REACT_APP_API_URL,
-  timeout: 60000,
+  timeout: 300000, // Increased timeout to 5 minutes for new users
   headers: {
     "Content-Type": "application/json",
   },
+  // Add retry logic
+  retry: 3,
+  retryDelay: (retryCount) => {
+    return retryCount * 2000; // exponential backoff
+  }
 })
 
 console.log('Using API URL:', api.defaults.baseURL);
 
-// Add response interceptor for better error handling
+// Add response interceptor for better error handling and retry logic
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     console.error("API Error:", error)
+
+    // Get the original request configuration
+    const originalRequest = error.config;
+
+    // Check if we should retry the request
+    if (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK" ||
+        (error.response && (error.response.status === 503 || error.response.status === 502))) {
+
+      // Only retry if we haven't already retried too many times
+      if (!originalRequest._retry) {
+        originalRequest._retry = 0;
+      }
+
+      if (originalRequest._retry < (api.defaults.retry || 3)) {
+        originalRequest._retry++;
+
+        // Calculate delay based on retry count
+        const delay = typeof api.defaults.retryDelay === 'function'
+          ? api.defaults.retryDelay(originalRequest._retry)
+          : 2000 * originalRequest._retry;
+
+        console.log(`Retrying request (${originalRequest._retry}/${api.defaults.retry}) after ${delay}ms delay...`);
+
+        // Wait for the delay
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        // Retry the request
+        return api(originalRequest);
+      }
+    }
+
+    // If we've exhausted retries or it's not a retryable error
     if (error.code === "ECONNABORTED") {
-      throw new Error("Request timed out. Server might be busy.")
+      throw new Error("Request timed out after multiple attempts. Server might be busy.")
     }
     if (!error.response) {
-      throw new Error("Cannot connect to server. Please try again later.")
+      throw new Error("Cannot connect to server after multiple attempts. Please try again later.")
     }
     throw error
   },
@@ -48,6 +86,7 @@ const Auth = () => {
   const [logoVisible, setLogoVisible] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
   const navigate = useNavigate()
+  const { login } = useAuth()
   const emailSuffix = "@srmist.edu.in"
 
   useEffect(() => {
@@ -55,39 +94,39 @@ const Auth = () => {
     setTimeout(() => {
       setLogoVisible(true)
     }, 300)
-    
+
     // Create particles effect
     createParticles()
   }, [])
-  
+
   const createParticles = () => {
     const particlesContainer = document.createElement('div')
     particlesContainer.className = 'particles'
-    
+
     for (let i = 0; i < 20; i++) {
       const particle = document.createElement('div')
       particle.className = 'particle'
-      
+
       // Random size between 5px and 15px
       const size = Math.random() * 10 + 5
       particle.style.width = `${size}px`
       particle.style.height = `${size}px`
-      
+
       // Random position
       particle.style.left = `${Math.random() * 100}%`
       particle.style.top = `${Math.random() * 100}%`
-      
+
       // Random animation duration between 15s and 30s
       const duration = Math.random() * 15 + 15
       particle.style.animationDuration = `${duration}s`
-      
+
       // Random animation delay
       particle.style.animationDelay = `${Math.random() * 5}s`
-      
+
       // Add to container
       particlesContainer.appendChild(particle)
     }
-    
+
     document.querySelector('.login-container').appendChild(particlesContainer)
   }
 
@@ -118,15 +157,15 @@ const Auth = () => {
   // Handle email input change
   const handleEmailChange = (e) => {
     let value = e.target.value.toLowerCase()
-    
+
     // Remove the suffix if it's already there
     if (value.endsWith(emailSuffix)) {
       value = value.slice(0, -emailSuffix.length)
     }
-    
+
     // Remove any @ symbols the user types
     value = value.replace(/@/g, '')
-    
+
     // Set the email state with just the username part
     setEmail(value)
   }
@@ -140,89 +179,134 @@ const Auth = () => {
     setLoading(true)
     setError("")
     setMessage("")
-  
+
     try {
       if (!email || !password) {
         throw new Error("Email and password are required")
       }
-      
+
       const fullEmail = getFullEmail();
-      
+
       console.log("Login attempt with:", { email: fullEmail });
-  
-      const response = await api.post("/api/login", { 
-        email: fullEmail, 
-        password 
+      setMessage("Connecting to server...")
+
+      // First check if the server is healthy
+      try {
+        const healthCheck = await api.get("/health", { timeout: 5000 });
+        console.log("Server health check:", healthCheck.data);
+        setMessage("Server is online. Verifying credentials...")
+      } catch (healthError) {
+        console.warn("Health check failed, but continuing with login attempt:", healthError);
+        setMessage("Server connection issues. Trying to log in anyway...")
+      }
+
+      // Attempt login with increased timeout
+      const response = await api.post("/api/login", {
+        email: fullEmail,
+        password
+      }, {
+        timeout: 180000 // 3 minutes timeout specifically for login
       });
-  
+
       // Check if response or response.data is undefined
       if (!response || !response.data) {
         throw new Error("Invalid server response");
       }
-  
+
       if (!response.data.success) {
         throw new Error(response.data.error || "Login failed")
       }
-  
+
       // Check if token and user exist before using them
       if (!response.data.token) {
         throw new Error("No authorization token received");
       }
-  
+
       // Safe access to user data
       const userData = response.data.user || {};
-  
-      localStorage.setItem("token", response.data.token)
-      localStorage.setItem("userEmail", userData.email || fullEmail)
-      localStorage.setItem("userId", userData.id || "")
-  
-      // Start polling for scraper status
-      let statusChecks = 0
-      const maxStatusChecks = 60 // ~2 minutes of checking
-      
-      const checkStatus = async () => {
-        try {
-          statusChecks++
-          if (statusChecks > maxStatusChecks) {
-            // If we exceed max checks, just move on
+
+      setMessage("Login successful! Loading your data...")
+
+      // Use AuthContext login function
+      login({
+        token: response.data.token,
+        email: userData.email || fullEmail,
+        id: userData.id || ""
+      })
+
+      // Store password in localStorage for potential use by the scraper
+      localStorage.setItem("userPassword", password);
+
+      // Check if this is a new user by looking for the isNewUser flag in the response
+      const isNewUser = response.data.isNewUser;
+
+      if (isNewUser) {
+        // For new users, we need to wait for data to be scraped before redirecting
+        setMessage("First login detected! Setting up your account and scraping your data. This may take a few minutes...")
+
+        // Start polling for scraper status
+        let statusChecks = 0
+        const maxStatusChecks = 150 // ~5 minutes of checking (2 seconds per check)
+
+        const checkStatus = async () => {
+          try {
+            statusChecks++
+            if (statusChecks > maxStatusChecks) {
+              // If we exceed max checks, just move on
+              setMessage("Data scraping is taking longer than expected. Redirecting to dashboard...")
+              setTimeout(() => {
+                navigate("/dashboard")
+              }, 2000)
+              return
+            }
+
+            // Update message with progress
+            if (statusChecks % 10 === 0) {
+              setMessage(`Setting up your account and scraping your data (${Math.min(Math.round((statusChecks / maxStatusChecks) * 100), 95)}%)...`)
+            }
+
+            const statusResponse = await api.get("/api/scraper-status", {
+              headers: { Authorization: `Bearer ${response.data.token}` },
+            })
+
+            // Safe object access
+            const status = statusResponse?.data?.status?.status;
+
+            if (status === "completed") {
+              // If scraping is complete, navigate to dashboard
+              setMessage("Data scraping completed! Redirecting to dashboard...")
+              setTimeout(() => {
+                navigate("/dashboard")
+              }, 1500)
+            } else if (status === "failed") {
+              // If scraping failed but login succeeded, still navigate
+              setMessage("Data scraping encountered an issue, but you can still access your dashboard.")
+              setTimeout(() => {
+                navigate("/dashboard")
+              }, 2000)
+            } else {
+              // Otherwise, check again after a delay
+              setTimeout(checkStatus, 2000)
+            }
+          } catch (error) {
+            console.error("Status check error:", error);
+            // If there's an error checking status, just navigate
+            setMessage("Unable to check data scraping status. Redirecting to dashboard...")
             setTimeout(() => {
               navigate("/dashboard")
-            }, 500)
-            return
+            }, 2000)
           }
-          
-          const statusResponse = await api.get("/api/scraper-status", {
-            headers: { Authorization: `Bearer ${response.data.token}` },
-          })
-          
-          // Safe object access
-          const status = statusResponse?.data?.status?.status;
-          
-          if (status === "completed") {
-            // If scraping is complete, navigate to dashboard
-            setTimeout(() => {
-              navigate("/dashboard")
-            }, 500)
-          } else if (status === "failed") {
-            // If scraping failed but login succeeded, still navigate
-            setTimeout(() => {
-              navigate("/dashboard")
-            }, 500)
-          } else {
-            // Otherwise, check again after a delay
-            setTimeout(checkStatus, 2000)
-          }
-        } catch (error) {
-          console.error("Status check error:", error);
-          // If there's an error checking status, just navigate
-          setTimeout(() => {
-            navigate("/dashboard")
-          }, 500)
         }
+
+        // Start status checking
+        checkStatus()
+      } else {
+        // For existing users, redirect immediately
+        setMessage("Login successful! Redirecting to dashboard...")
+        setTimeout(() => {
+          navigate("/dashboard")
+        }, 1000)
       }
-      
-      // Start status checking
-      checkStatus()
     } catch (error) {
       console.error("Auth error:", error)
       setError(error.message || "An error occurred during login")
@@ -252,12 +336,12 @@ const Auth = () => {
   return (
     <div className="login-container">
       <div className="login-background"></div>
-      
+
       {/* Animated Boxes */}
       <div className="box"></div>
       <div className="box"></div>
       <div className="box"></div>
-      
+
       <div className="login-card-container">
         <div className="login-card">
           <h1>Acadia Student Portal</h1>
@@ -323,7 +407,7 @@ const Auth = () => {
                   {password.split('').map((char, index) => (
                     <span
                       key={index}
-                      style={{ 
+                      style={{
                         visibility: revealedChars.includes(index) ? 'visible' : 'hidden',
                         color: '#ffffff'
                       }}
@@ -345,7 +429,7 @@ const Auth = () => {
               Sign In
             </button>
           </form>
-          
+
           {loading && <LoadingIndicator message="Checking your credentials..." />}
         </div>
       </div>
