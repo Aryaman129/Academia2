@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
     const userId = localStorage.getItem('userId');
-    
+
     if (token && email) {
       setUser({
         email,
@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
         token
       });
     }
-    
+
     setLoading(false);
   }, []);
 
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     if (userData.id) {
       localStorage.setItem('userId', userData.id);
     }
-    
+
     // Update state
     setUser({
       email: userData.email,
@@ -49,11 +49,13 @@ export const AuthProvider = ({ children }) => {
 
   // Logout function
   const logout = () => {
-    // Clear localStorage
+    // Clear all authentication data from localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userId');
-    
+    localStorage.removeItem('userPassword');
+    localStorage.removeItem('isLoggedIn');
+
     // Update state
     setUser(null);
   };

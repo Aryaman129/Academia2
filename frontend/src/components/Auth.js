@@ -97,6 +97,9 @@ const Auth = () => {
 
     // Create particles effect
     createParticles()
+
+    // Check for stored credentials and auto-login
+    autoLogin()
   }, [])
 
   const createParticles = () => {
@@ -173,23 +176,40 @@ const Auth = () => {
   // Get the full email with suffix
   const getFullEmail = () => `${email}${emailSuffix}`
 
-  // Handle login
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-    setMessage("")
+  // Auto-login with stored credentials
+  const autoLogin = async () => {
+    // Check if we have stored credentials
+    const storedEmail = localStorage.getItem("userEmail")
+    const storedPassword = localStorage.getItem("userPassword")
 
-    try {
-      if (!email || !password) {
-        throw new Error("Email and password are required")
+    if (storedEmail && storedPassword) {
+      // Set the email field (without the suffix)
+      if (storedEmail.endsWith(emailSuffix)) {
+        setEmail(storedEmail.slice(0, -emailSuffix.length))
+      } else {
+        setEmail(storedEmail)
       }
 
-      const fullEmail = getFullEmail();
+      // Set the password field
+      setPassword(storedPassword)
 
-      console.log("Login attempt with:", { email: fullEmail });
-      setMessage("Connecting to server...")
+      // Attempt login with stored credentials
+      setLoading(true)
+      setMessage("Attempting to log in with saved credentials...")
 
+      try {
+        await attemptLogin(storedEmail.endsWith(emailSuffix) ? storedEmail : storedEmail + emailSuffix, storedPassword)
+      } catch (error) {
+        console.error("Auto-login failed:", error)
+        setLoading(false)
+        // Don't show error for auto-login failures
+      }
+    }
+  }
+
+  // Attempt login with given credentials
+  const attemptLogin = async (fullEmail, password) => {
+    try {
       // First check if the server is healthy
       try {
         const healthCheck = await api.get("/health", { timeout: 5000 });
@@ -234,8 +254,10 @@ const Auth = () => {
         id: userData.id || ""
       })
 
-      // Store password in localStorage for potential use by the scraper
+      // Store credentials in localStorage for persistent login
+      localStorage.setItem("userEmail", fullEmail);
       localStorage.setItem("userPassword", password);
+      localStorage.setItem("isLoggedIn", "true");
 
       // Check if this is a new user by looking for the isNewUser flag in the response
       const isNewUser = response.data.isNewUser;
@@ -307,6 +329,35 @@ const Auth = () => {
           navigate("/dashboard")
         }, 1000)
       }
+
+      return true;
+    } catch (error) {
+      console.error("Auth error:", error)
+      throw error;
+    }
+  }
+
+  // Handle login form submission
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+    setMessage("")
+
+    try {
+      if (!email || !password) {
+        throw new Error("Email and password are required")
+      }
+
+      const fullEmail = getFullEmail();
+
+      console.log("Login attempt with:", { email: fullEmail });
+
+      try {
+        await attemptLogin(fullEmail, password);
+      } catch (error) {
+        throw error;
+      }
     } catch (error) {
       console.error("Auth error:", error)
       setError(error.message || "An error occurred during login")
@@ -371,7 +422,7 @@ const Auth = () => {
                 type={showPassword ? "text" : "password"}
                 required
                 placeholder=" "
-                value={!showPassword ? password : ''}
+                value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setActiveInput('password')}
                 onBlur={() => setActiveInput(null)}
