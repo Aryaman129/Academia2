@@ -767,6 +767,29 @@ const Dashboard = () => {
     }
   }, [deadlines, checkUpcomingDeadlines]);
 
+  // Periodically check for upcoming deadlines every 10 minutes
+  useEffect(() => {
+    // Only set up periodic checks if we have deadlines
+    if (Object.keys(deadlines).length > 0) {
+      console.log('Setting up periodic deadline checks every 10 minutes');
+
+      // Check immediately on first load
+      checkUpcomingDeadlines();
+
+      // Then check every 10 minutes (600000 ms)
+      const intervalId = setInterval(() => {
+        console.log('Performing periodic deadline check');
+        checkUpcomingDeadlines();
+      }, 600000);
+
+      // Clean up interval on unmount
+      return () => {
+        console.log('Clearing periodic deadline checks');
+        clearInterval(intervalId);
+      };
+    }
+  }, [deadlines, checkUpcomingDeadlines]);
+
   const renderCalendar = () => {
     const currentDate = new Date();
     const currentMonth = currentDate.toLocaleString('default', { month: 'long' }).toUpperCase();
